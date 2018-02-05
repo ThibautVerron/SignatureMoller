@@ -1,6 +1,6 @@
 // Created: Wed Dec 13 17:47:42 2017
-// Last modified: Mon Feb  5 14:50:01 2018
-// Hash: a74e6a622b74b5a1986cabbb4a4af383
+// Last modified: Mon Feb  5 15:32:06 2018
+// Hash: 4790489fa52651b5373f06d3a28a87e5
 
 Sig := recformat<k,mu,i>;
 
@@ -357,6 +357,8 @@ function Moller_GB (F,funs :
     interm_ideals := [];
     m := #F;
     ss := 1;
+    cnt_vectsets := 0;
+    cnt_satsets := 0;
     cnt_red0 := 0;
     cnt_sing_pairs := 0;
     cnt_1sing_red := 0;
@@ -401,16 +403,21 @@ function Moller_GB (F,funs :
             print "S=", S;
 
             if Signature then
-                sigS := Sig_OfSatSet(S,LMs,sigs);
+                sigS,smax := Sig_OfSatSet(S,LMs,sigs);
+                ss := smax[1];
+            else
+                ss := Max(S);
             end if;
             
             if #S eq 1 then
                 continue;
             end if;
 
+            cnt_satsets +:= 1;
+            
             XS := SatSet_lcm(S,LMs);
 
-            ss := Max(S);
+            /* ss := Max(S); */
             f_current := pols[ss];
             lm_current := LeadingMonomial(f_current);
             
@@ -437,6 +444,7 @@ function Moller_GB (F,funs :
                     SigG := 0; // Arbitrary, for the call to reduce
                 end if;
 
+                cnt_vectsets +:= 1;
                 
                 bb := LinDecomp(LC_S,b_S*LCs[ss]);
                 g := b_S*(XS div lm_current) * f_current;
@@ -485,6 +493,8 @@ function Moller_GB (F,funs :
             end for;
         end while;
     end for;
+    printf "Total # of vectorsets: %o\n", cnt_vectsets;
+    printf "Total # of saturated sets: %o\n", cnt_satsets;
     printf "Total # of reductions to 0: %o\n", cnt_red0;
     printf "Total # of skipped singular S-pairs: %o\n", cnt_sing_pairs;
     printf "Total # of skipped F5 S-pairs: %o\n", cnt_F5_pairs;
