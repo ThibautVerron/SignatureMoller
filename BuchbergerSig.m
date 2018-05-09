@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Wed May  9 13:07:16 2018
-// Hash: 0ccd314190b5c80dde6cd6e1938446f8
+// Last modified: Wed May  9 13:21:37 2018
+// Hash: 51872c95929ada5ce0e53d2f2ae897f6
 
 load "Signatures.m";
 
@@ -129,6 +129,33 @@ function Criterion_GebauerMoller(T,G,i,j)
     return test;
 end function;
 
+function Criterion_1SingularReducible(f,sf,G,sigs)
+    // Assumes that f is regular-reduced modulo G
+
+    test := false;
+    tf := LeadingTerm(f);
+    mf := LeadingMonomial(f);
+    cf := LeadingCoefficient(f);
+
+    for i in [1..#G] do
+        g := G[i];
+        sg := sigs[i];
+        if IsDivisibleBy(tf,LeadingTerm(g)) then
+            mmg := mf div LeadingMonomial(g);
+            ccg := cf div LeadingCoefficient(g);
+            if Sig_Eq(sf,Sig_Multiply(sg,ccg,mmg)) then
+                // QUESTION: Would Simeq be sufficient above?
+                test := true;
+                break;
+            end if;
+        end if;
+    end for;
+    return test;
+end function;
+
+
+
+
 
 procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf
                            : Signature := false)
@@ -201,7 +228,11 @@ function BuchbergerSig(F:
             p := pp[1]; sp := pp[2];
             r := StrongReduce(p,sp,SG,sigsSG
                                    : Signature := Signature);
-            if r ne 0 then
+            if r ne 0
+               and ((not Signature)
+                    or
+                    (not Criterion_1SingularReducible(r,sp,SG,sigsSG)))
+                then
                 printf "   LT=%o\n", LeadingTerm(r);
                 UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp
                                  : Signature := Signature);
