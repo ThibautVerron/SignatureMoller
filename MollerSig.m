@@ -1,74 +1,8 @@
 // Created: Wed Dec 13 17:47:42 2017
-// Last modified: Mon Feb  5 15:32:06 2018
-// Hash: 4790489fa52651b5373f06d3a28a87e5
+// Last modified: Tue May  8 16:04:10 2018
+// Hash: f9c842112c7b3079ca04311fe4955b26
 
-Sig := recformat<k,mu,i>;
-
-function Sig_Create(coef,mon,i)
-    /* Create a signature coef * mon * e_i */
-    aa := rec<Sig|>;
-    aa`k := coef;
-    aa`mu := mon;
-    aa`i := i;
-    return aa;
-end function;
-
-function Sig_Multiply(aa,coef,mon)
-    /* Multiply the signature aa with coef*mon */
-    return Sig_Create(aa`k*coef,aa`mu*mon,aa`i);
-end function;
-
-function Sig_Simeq(s1,s2)
-    /* True iff s1 \simeq s2 (equality of the module monomial parts)
-     */
-    return s1`mu eq s2`mu and s1`i eq s2`i;
-end function;
-
-function Sig_Eq(s1,s2)
-    /* True iff s1 = s2 */
-    return Sig_Simeq(s1,s2) and s1`k eq s2`k;
-end function;
-
-function Sig_Lt(s1,s2)
-    /* True iff s1 \prec s2 */
-    return s1`i lt s2`i or (s1`i eq s2`i and s1`mu lt s2`mu);
-end function;
-
-function Sig_Leq(s1,s2)
-    /* True iff s1 \prec s2 or s1 \simeq s2 */
-    return Sig_Lt(s1,s2) or Sig_Simeq(s1,s2);
-end function;
-
-function Sig_Compare(s1,s2)
-    /* Comparison function, suitable for Sort */
-    if Sig_Lt(s1,s2) then
-        return -1;
-    elif Sig_Simeq(s1,s2) then
-        return 0;
-    else
-        return 1;
-    end if;
-end function;
-
-function Sig_ToString(s)
-    /* Convert a signature to a printable string */
-    return Sprintf("%o*%o*e_%o",s`k,s`mu,s`i);
-end function;
-
-function SatSet_of_mon(LMs,m,XS)
-    /* Returns the largest saturated set of {1..m} wrt LMs[1]...LMs[m]
-    whose lcm divides XS.
-
-    The output is the set of all j in {1..m} such that LMs[j] divides
-    XS.
-   */
-    S := [];
-    while exists(k){k : k in [1..m] | (not k in S)
-                                      and IsDivisibleBy(XS,LMs[k])} do
-        Append(~S,k);
-    end while;
-    return S;
-end function;
+load "Signatures.m";
 
 function SatSet_lcm(S,LMs)
     /* Given a saturated set S, returns its lcm x^S */
