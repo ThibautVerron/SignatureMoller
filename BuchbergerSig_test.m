@@ -1,6 +1,6 @@
 // Created: Thu Dec 14 11:25:07 2017
-// Last modified: Wed May  9 13:06:33 2018
-// Hash: 4afbbd59901cac4b232deac9f04d23b2
+// Last modified: Wed May  9 15:23:30 2018
+// Hash: 39a9ad15281c6fddf6b8ed237bbae06d
 
 ChangeDirectory("/home/guests/verron/Dropbox/Recherche/2017-Moller-sig/web");
 
@@ -19,7 +19,9 @@ FF := [F[1],F[2],
        8*Y^3 - 4*Y^2*Z - 5*X*Z^2 // Result of reducing
       ];
 
-GG,SG,sigs := BuchbergerSig(F : Signature := true);
+GG,SG,sigs,sigsSG,T := BuchbergerSig(F :
+                                     Signature := true,
+                                     GebauerMoller := false);
 G := GG;
 Gp := [];
 while G ne Gp do
