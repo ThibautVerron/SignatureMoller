@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Wed May  9 13:28:55 2018
-// Hash: 040d64322868cd77a5f87002ba41ddb7
+// Last modified: Wed May  9 13:33:18 2018
+// Hash: f25dd3abdf3e2d5dec25a1ead0bc59fe
 
 load "Signatures.m";
 
@@ -213,7 +213,7 @@ end procedure;
 function BuchbergerSig(F:
                     Signature := true,
                     F5_Criterion := true,
-                    Sing_Criterion := false)
+                    Sing_Criterion := true)
     G := [];
     SG := [];
     P := [];
@@ -238,19 +238,28 @@ function BuchbergerSig(F:
             next := 1; 
             pp := P[next]; Remove(~P,next);
             p := pp[1]; sp := pp[2];
-            if ((not F5_Criterion)
-                or Criterion_F5(p,sp,SG,sigsSG)) then
-                r := StrongReduce(p,sp,SG,sigsSG
-                                  : Signature := Signature);
-                if r ne 0
-                   and ((not Signature)
-                        or
-                        (not Criterion_1SingularReducible(r,sp,SG,sigsSG)))
-                    then
-                    printf "   LT=%o\n", LeadingTerm(r);
-                    UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp
-                                     : Signature := Signature);
+            if Signature then
+                if (F5_Criterion
+                    and not Criterion_F5(p,sp,SG,sigsSG)) then
+                    printf "Polynomial excluded by F5 criterion\n";
+                    continue;
+                elif (Sing_Criterion
+                      and exists{s : s in sigs | Sig_Eq(s,sp)}) then
+                    printf "Polynomial excluded by Singular criterion\n";
+                    continue;
                 end if;
+            end if;
+            
+            r := StrongReduce(p,sp,SG,sigsSG
+                              : Signature := Signature);
+            if r ne 0
+               and ((not Signature)
+                    or
+                    (not Criterion_1SingularReducible(r,sp,SG,sigsSG)))
+                then
+                printf "   LT=%o\n", LeadingTerm(r);
+                UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp
+                                 : Signature := Signature);
             end if;
         end while;
     end for;
