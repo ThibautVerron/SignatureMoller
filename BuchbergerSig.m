@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Wed May  9 11:26:07 2018
-// Hash: fe0a4f6a249ceb21b241e431fe5caf5c
+// Last modified: Wed May  9 13:07:16 2018
+// Hash: 0ccd314190b5c80dde6cd6e1938446f8
 
 load "Signatures.m";
 
@@ -162,8 +162,8 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf
     // Updating the strong basis
     Append(~SG,f);
     Append(~sigsSG,sf);
-    for i in [1..#SG-1] do
-        p,sp := GPol(f,SG[i],sf,sigsSG[i]);
+    for i in [1..#G-1] do
+        p,sp := GPol(f,G[i],sf,sigs[i]);
         if p ne 0 and (not Signature or not Sig_IsNull(sp)) then
             Append(~SG,p);
             Append(~sigsSG,sp);
