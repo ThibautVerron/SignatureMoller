@@ -1,32 +1,23 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Wed May  9 10:28:34 2018
-// Hash: 223d09f12dda75ab87e558ebdfc94fe9
+// Last modified: Wed May  9 11:26:07 2018
+// Hash: fe0a4f6a249ceb21b241e431fe5caf5c
 
 load "Signatures.m";
 
-function SPol(f1,f2,s1,s2)
-    m1 := LeadingMonomial(f1);
-    m2 := LeadingMonomial(f2);
-    if Gcd(m1,m2) ne 1 then 
-        c1 := LeadingCoefficient(f1);
-        c2 := LeadingCoefficient(f2);
-        m := Lcm(m1,m2);
-        c := Lcm(c1,c2);
-        mm1 := m div m1;
-        cc1 := c div c1;
-        mm2 := m div m2;
-        cc2 := c div c2;
-        f := cc1*mm1*f1 - cc2*mm2*f2;
-        sf1 := Sig_Multiply(s1,cc1,mm1);
-        sf2 := Sig_Multiply(s2,cc2,mm2);
-        if not Sig_Simeq(sf1,sf2) then
-            sf := Sig_Max(sf1,sf2);
-        else
-            sf := Sig_Null;
-        end if;
+function SPol(f1,f2,t,s1,s2)
+    t1 := t div LeadingTerm(f1);
+    t2 := t div LeadingTerm(f2);
+    mm1 := LeadingMonomial(t1);
+    cc1 := LeadingCoefficient(t1);
+    mm2 := LeadingMonomial(t2);
+    cc2 := LeadingCoefficient(t2);
+    f := cc1*mm1*f1 - cc2*mm2*f2;
+    sf1 := Sig_Multiply(s1,cc1,mm1);
+    sf2 := Sig_Multiply(s2,cc2,mm2);
+    if not Sig_Simeq(sf1,sf2) then
+        sf := Sig_Max(sf1,sf2);
     else
-        f := Parent(f1)!0;
-        sf := s1;
+        sf := Sig_Null;
     end if;
     return f,sf;
 end function;
@@ -96,20 +87,72 @@ end function;
 /*     return NormalForm(f,G); */
 /* end function; */
 
+function Criterion_Coprime(f,g)
+    return Gcd(LeadingMonomial(f),LeadingMonomial(g)) ne 1;
+end function;
 
-procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,f,sf
+function Criterion_GebauerMoller(T,G,i,j)
+    test := true;
+
+    if i gt j then
+        i,j := Explode(<j,i>);
+    end if;
+
+    // Testing B_k for all k>j
+    for k in [j+1..#G] do
+        if IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
+           and #{T[k][i],T[j][i],T[k,j]} eq 3 then
+            test := false;
+        end if;
+    end for;
+
+    if test then
+        // Testing M
+        for k in [1..j-1] do
+            if IsDivisibleBy(T[j][k],T[j][i])
+               and T[j][k] div T[j][i] eq T[j][k] then
+                test := false;
+                break;
+            end if;
+        end for;
+
+        if test then
+            // Testing F
+            for k in [1..i-1] do
+                if T[j][k] eq T[j][i] then
+                    test := false;
+                    break;
+                end if;
+            end for;
+        end if;
+    end if;
+    return test;
+end function;
+
+
+procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf
                            : Signature := false)
 
     // Updating the weak basis
     Append(~G,f);
+    N := #G;
     Append(~sigs,sf);
+
+    // Updating T
+    Append(~T,[]);
+    t := LeadingTerm(f);
+    for i in [1..N-1] do
+        Append(~T[N],Lcm(LeadingTerm(G[i]),t));
+    end for;
     
     // Updating the list of critical pairs
-    N := #G;
     for i in [1..N-1] do
-        p,sp := SPol(f,G[i],sf,sigs[i]);
-        if p ne 0 and (not Signature or not Sig_IsNull(sp)) then
-            Append(~P,<p,sp>);
+        if Criterion_Coprime(f,G[i])
+           and Criterion_GebauerMoller(T,G,i,N) then
+            p,sp := SPol(f,G[i],T[N][i],sf,sigs[i]);
+            if p ne 0 and (not Signature or not Sig_IsNull(sp)) then
+                Append(~P,<p,sp>);
+            end if;
         end if;
     end for;
     if Signature then
@@ -137,6 +180,7 @@ function BuchbergerSig(F:
     P := [];
     sigs := [];
     sigsSG := [];
+    T := []; // T[j][i] is the lcm of the LT of G[i] and G[j]
     m := #F;
     A := Parent(F[1]);
     for i in [1..m] do
@@ -148,7 +192,7 @@ function BuchbergerSig(F:
         if f eq 0 then
             continue;
         end if;
-        UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,f,sf
+        UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf
                          : Signature := Signature);
         while #P gt 0 do
             printf "#P=%o #G=%o\n", #P, #G;
@@ -159,7 +203,7 @@ function BuchbergerSig(F:
                                    : Signature := Signature);
             if r ne 0 then
                 printf "   LT=%o\n", LeadingTerm(r);
-                UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,r,sp
+                UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp
                                  : Signature := Signature);
             end if;
         end while;
