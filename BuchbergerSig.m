@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Wed May  9 15:23:15 2018
-// Hash: 08f48b82a7a6f7f17d6e065faf26e4e9
+// Last modified: Thu Jun  7 11:24:25 2018
+// Hash: dbbe7dc9e34bf22ad51477b70910d18b
 
 load "Signatures.m";
 
@@ -58,7 +58,7 @@ function StrongReduce(f,sf,G,sigs
                 md := LeadingMonomial(d);
                 if ((not Signature)
                     or
-                    (not Sig_Simeq(sf,Sig_Multiply(sigs[i],md,1)))) then
+                    (Sig_Lt(Sig_Multiply(sigs[i],md,1),sf))) then
                     f -:= d * g;
                     done := false;
                     if f eq 0 then
@@ -94,7 +94,8 @@ end function;
 function Criterion_GebauerMoller_B(T,G,i,j,k)
     test := true;
     test := j ge k or not(IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
-                and #{T[k][i],T[j][i],T[k][j]} eq 3);
+                          and T[k][i] ne T[j][i]
+                          and T[k][j] ne T[j][i]);
     return test;
 end function;
     
@@ -137,15 +138,26 @@ function Criterion_1SingularReducible(f,sf,G,sigs)
     for i in [1..#G] do
         g := G[i];
         sg := sigs[i];
-        if IsDivisibleBy(tf,LeadingTerm(g)) then
-            mmg := mf div LeadingMonomial(g);
-            ccg := cf div LeadingCoefficient(g);
-            if Sig_Eq(sf,Sig_Multiply(sg,ccg,mmg)) then
-                // QUESTION: Would Simeq be sufficient above?
-                test := true;
-                break;
-            end if;
+        test2, mmg := IsDivisibleBy(mf,LeadingMonomial(g));
+        if test2
+           and sg`i eq sf`i
+           and (sg`mu * mmg) eq sf`mu
+           and IsDivisibleBy(sf`k,sg`k) then
+            test := true;
+            break;
         end if;
+                
+        /* if IsDivisibleBy(tf,LeadingTerm(g)) then */
+        /*     mmg := mf div LeadingMonomial(g); */
+        /*     ccg := cf div LeadingCoefficient(g); */
+        /*     s := Sig_Multiply(sg,ccg,mmg); */
+        /*     if Sig_Simeq(sf,s) then */
+        /*         // QUESTION: Why does it work better with simeq? */
+        /*     /\* if sg`i eq sf`i and sg`mu*mmg eq sf`mu and IsDivisibleBy(sf`k,sg`k) then *\/ */
+        /*         test := true; */
+        /*         break; */
+        /*     end if; */
+        /* end if; */
     end for;
     return test;
 end function;
@@ -162,6 +174,14 @@ function Criterion_F5(f,sf,SG,sigsSG)
     mon_red := StrongReduce(mon,sf,LPols,sigsSG : Signature:=false);
     res := mon_red ne 0;
     return res;
+end function;
+
+function Criterion_Singular(F,sf,G,sigs)
+    test := exists{s : s in sigs | s`i eq sf`i
+                                   and s`mu eq sf`mu
+                                   and s`k eq sf`k
+                                   /* and IsDivisibleBy(sf`k,s`k) */};
+    return not test;
 end function;
 
 
@@ -221,8 +241,8 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     // Updating the strong basis
     Append(~SG,f);
     Append(~sigsSG,sf);
-    for i in [1..#G-1] do
-        p,sp := GPol(f,G[i],sf,sigs[i]);
+    for i in [1..#SG-1] do
+        p,sp := GPol(f,SG[i],sf,sigsSG[i]);
         if p ne 0 and (not Signature or not Sig_IsNull(sp)) then
             Append(~SG,p);
             Append(~sigsSG,sp);
@@ -262,7 +282,7 @@ function BuchbergerSig(F:
         printf "i=%o\n",i;
         f := F[i]; // We get a wrong result if we reduce first???
         sf := Sig_Create(1,1,i);
-        f := StrongReduce(f,sf,SG,sigs
+        f := StrongReduce(f,sf,SG,sigsSG
                                : Signature := Signature); 
         if f eq 0 then
             continue;
@@ -283,7 +303,7 @@ function BuchbergerSig(F:
                     cnt_F5 +:= 1;
                     continue;
                 elif (Sing_Criterion
-                      and exists{s : s in sigs | Sig_Eq(s,sp)}) then
+                      and not Criterion_Singular(p,sp,G,sigs)) then
                     printf "Polynomial excluded by Singular criterion\n";
                     cnt_sing +:= 1;
                     continue;

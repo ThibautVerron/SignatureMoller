@@ -1,6 +1,6 @@
 // Created: Thu Dec 14 11:25:07 2017
-// Last modified: Wed May  9 15:23:30 2018
-// Hash: 39a9ad15281c6fddf6b8ed237bbae06d
+// Last modified: Tue May 15 16:11:27 2018
+// Hash: 99122ebf9728f158f9107cc5c0d4f3aa
 
 ChangeDirectory("/home/guests/verron/Dropbox/Recherche/2017-Moller-sig/web");
 
@@ -9,7 +9,7 @@ load "BuchbergerSig.m";
 P<X,Y,Z> := PolynomialRing(IntegerRing(),3,"grevlex");
 
 F := [3*X^2*Y + 7*Y^2*Z,
-      X-2*Y+Z,
+      X*Y-2*Y*Z+Z^2,
       4*X*Y^2 - 5*X*Z^2
      ];
 
@@ -21,7 +21,7 @@ FF := [F[1],F[2],
 
 GG,SG,sigs,sigsSG,T := BuchbergerSig(F :
                                      Signature := true,
-                                     GebauerMoller := false);
+                                     GebauerMoller := true);
 G := GG;
 Gp := [];
 while G ne Gp do
@@ -74,3 +74,7 @@ SPolynomial(f,g);
 SPol(f,g);
 3*f - 2*g;
 end if;
+
+for i in [1..#GG] do
+    printf "%o\t\t%o\n", GG[i], Sig_ToString(sigs[i]);
+end for;
