@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Thu Jun  7 11:24:25 2018
-// Hash: dbbe7dc9e34bf22ad51477b70910d18b
+// Last modified: Thu Jul 12 15:07:06 2018
+// Hash: dd0443bd10e4bee839fdee61290670aa
 
 load "Signatures.m";
 
@@ -14,11 +14,14 @@ function SPol(f1,f2,t,s1,s2)
     f := cc1*mm1*f1 - cc2*mm2*f2;
     sf1 := Sig_Multiply(s1,cc1,mm1);
     sf2 := Sig_Multiply(s2,cc2,mm2);
-    if not Sig_Simeq(sf1,sf2) then
-        sf := Sig_Max(sf1,sf2);
-    else
-        sf := Sig_Null;
-    end if;
+    // This excludes all singular S-polynomials
+    /* if not Sig_Simeq(sf1,sf2) then */
+    /*     sf := Sig_Max(sf1,sf2); */
+    /* else */
+    /*     sf := Sig_Null; */
+    /* end if; */
+    msf2 := Sig_Multiply(sf2,-1,1);
+    sf := Sig_Add(sf1,msf2); // Null iff strictly singular
     return f,sf;
 end function;
 
@@ -56,10 +59,18 @@ function StrongReduce(f,sf,G,sigs
             test,d := IsDivisibleBy(tf,tg);
             if test then
                 md := LeadingMonomial(d);
+                cd := LeadingCoefficient(d);
+                sig_red := Sig_Multiply(sigs[i],(-1)*cd,md);
+                sig_res := Sig_Add(sf,sig_red);
                 if ((not Signature)
                     or
-                    (Sig_Lt(Sig_Multiply(sigs[i],md,1),sf))) then
+                    // Only regular reductions
+                    /* (Sig_Lt(Sig_Multiply(sigs[i],md,1),sf))  */
+                    // Only non strictly singular reductions
+                    (not Sig_IsNull(sig_res))
+                   )  then
                     f -:= d * g;
+                    sf := sig_res;
                     done := false;
                     if f eq 0 then
                         break;
@@ -68,19 +79,20 @@ function StrongReduce(f,sf,G,sigs
             end if;
         end for;
     end while;
-    return f;
+    return f,sf;
 end function;
 
 function TotalStrongReduce(f,sf,G,sigs 
                            : Signature := false)
     res := 0;
     ff := f;
+    sff := sf;
     while ff ne 0 do
-        ff := StrongReduce(ff,sf,G,sigs : Signature := Signature);
+        ff,sff := StrongReduce(ff,sff,G,sigs : Signature := Signature);
         res +:= LeadingTerm(ff);
         ff -:= LeadingTerm(ff);
     end while;
-    return res;
+    return res,sff;
 end function;
 
 /* function StrongReduce(f,G) */
@@ -94,8 +106,11 @@ end function;
 function Criterion_GebauerMoller_B(T,G,i,j,k)
     test := true;
     test := j ge k or not(IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
-                          and T[k][i] ne T[j][i]
-                          and T[k][j] ne T[j][i]);
+                          /* and LeadingMonomial(T[k][i]) ne LeadingMonomial(T[j][i]) */
+                          /* and LeadingMonomial(T[k][j]) ne LeadingMonomial(T[j][i]) */
+                          and (T[k][i]) ne (T[j][i])
+                          and (T[k][j]) ne (T[j][i])
+                         );
     return test;
 end function;
     
@@ -108,7 +123,8 @@ function Criterion_GebauerMoller_M(T,i,k)
 
     for j in [1..k-1] do
         if IsDivisibleBy(T[k][i],T[k][j])
-           and T[k][i] ne T[k][j] then
+                        /* and LeadingMonomial(T[k][i]) ne LeadingMonomial(T[k][j]) */
+           and (T[k][i]) ne (T[k][j]) then
             test := false;
             break;
         end if;
@@ -171,7 +187,7 @@ function Criterion_F5(f,sf,SG,sigsSG)
               : i in [1..#SG]
               | Sig_Lt(sigsSG[i],slim)];
     mon := sf`k * sf`mu;
-    mon_red := StrongReduce(mon,sf,LPols,sigsSG : Signature:=false);
+    mon_red,_ := StrongReduce(mon,sf,LPols,sigsSG : Signature:=false);
     res := mon_red ne 0;
     return res;
 end function;
@@ -282,7 +298,7 @@ function BuchbergerSig(F:
         printf "i=%o\n",i;
         f := F[i]; // We get a wrong result if we reduce first???
         sf := Sig_Create(1,1,i);
-        f := StrongReduce(f,sf,SG,sigsSG
+        f,sf := StrongReduce(f,sf,SG,sigsSG
                                : Signature := Signature); 
         if f eq 0 then
             continue;
@@ -310,7 +326,7 @@ function BuchbergerSig(F:
                 end if;
             end if;
             
-            r := StrongReduce(p,sp,SG,sigsSG
+            r,sp := StrongReduce(p,sp,SG,sigsSG
                               : Signature := Signature);
             if r eq 0 then
                 printf "Reduction to zero: sig=%o\n", Sig_ToString(sp);
