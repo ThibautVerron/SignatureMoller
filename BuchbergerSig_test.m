@@ -1,8 +1,8 @@
 // Created: Thu Dec 14 11:25:07 2017
-// Last modified: Wed Jul 11 15:13:42 2018
-// Hash: 99122ebf9728f158f9107cc5c0d4f3aa
+// Last modified: Fri Dec  7 09:37:36 2018
+// Hash: d87d5ecfc957667bfb2160211f0bcc4f
 
-ChangeDirectory("/home/guests/verron/Dropbox/Recherche/2017-Moller-sig/web");
+ChangeDirectory("/home/guests/verron/Recherche/2017-Moller-sig/web");
 
 load "BuchbergerSig.m";
   
@@ -30,23 +30,24 @@ while G ne Gp do
 end while;
 
 SSG := ReduceGroebnerBasis(SG);
-      
+
 
 test := IsGroebner(G);
 test;
 Ideal(G) eq Ideal(F);
+IsGroebner(SSG);
 
-if not test then
-    G_missing := [g : g in GroebnerBasis(G) | NormalForm(g,G) ne 0];
-    G_missing;
+/* if not test then */
+/*     G_missing := [g : g in GroebnerBasis(G) | NormalForm(g,G) ne 0]; */
+/*     G_missing; */
     
-    gg := G_missing[1];
+/*     gg := G_missing[1]; */
     
-    I := IdealWithFixedBasis(F);
+/*     I := IdealWithFixedBasis(F); */
     
-    Coordinates(I,gg);
+/*     Coordinates(I,gg); */
 
-end if;
+/* end if; */
 
 LTG := [LeadingTerm(g) : g in GG];
 LTI := [LeadingTerm(g) : g in GroebnerBasis(G)];
@@ -61,6 +62,16 @@ Ideal(LTG) eq Ideal(LTI);
 /* Ideal(FF) eq Ideal(F); */
 /* Ideal(G2) eq Ideal(G); */
 
+PQ := PolynomialRing(RationalField(),Rank(P),"grevlex");
+
+FQ := [PQ!f : f in F];
+
+S<T> := RationalFunctionField(RationalField());
+
+H1 := S ! HilbertSeries(Ideal(FQ)); H1;
+H2 := &*[1-T^Degree(f) : f in F]/(1-T)^(Rank(P)); H2;
+
+
 
 /* /!\  BUG WITH S-POLYNOMIAL */
 
@@ -73,8 +84,12 @@ g := 6*X-Z;
 SPolynomial(f,g);
 SPol(f,g);
 3*f - 2*g;
-end if;
 
 for i in [1..#GG] do
     printf "%o\t\t%o\n", GG[i], Sig_ToString(sigs[i]);
 end for;
+end if;
+
+
+/* /!\ Looking for reductions to zero */
+

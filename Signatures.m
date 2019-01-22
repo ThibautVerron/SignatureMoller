@@ -1,6 +1,6 @@
 // Created: Tue May  8 16:03:43 2018
-// Last modified: Wed Jul 11 15:13:00 2018
-// Hash: b11a8e7a04f9d02620a020ad44dc1b96
+// Last modified: Wed Jan 16 13:59:43 2019
+// Hash: 83fb4379723e57649188fc80ebebebf6
 
 Sig := recformat<k,mu,i>;
 
@@ -16,13 +16,13 @@ end function;
 Sig_Null := Sig_Create(1,1,0);
 
 function Sig_IsNull(s)
-    return s`i eq 0;
+    return s`i eq 0 or s`k eq 0;
 end function;
 
 function Sig_Simeq(s1,s2)
     /* True iff s1 \simeq s2 (equality of the module monomial parts)
      */
-    return s1`mu eq s2`mu and s1`i eq s2`i;
+    return (Sig_IsNull(s1) and Sig_IsNull(s2)) or (s1`mu eq s2`mu and s1`i eq s2`i);
 end function;
 
 function Sig_Eq(s1,s2)
@@ -32,12 +32,16 @@ end function;
 
 function Sig_Lt(s1,s2)
     /* True iff s1 \prec s2 */
-    return s1`i lt s2`i or (s1`i eq s2`i and s1`mu lt s2`mu);
+    return Sig_IsNull(s1) or s1`i lt s2`i or (s1`i eq s2`i and s1`mu lt s2`mu);
 end function;
 
 function Sig_Leq(s1,s2)
     /* True iff s1 \prec s2 or s1 \simeq s2 */
     return Sig_Lt(s1,s2) or Sig_Simeq(s1,s2);
+end function;
+
+function Sig_Geq(s1,s2)
+    return not Sig_Lt(s1,s2);
 end function;
 
 
@@ -56,6 +60,7 @@ end function;
 
 function Sig_Add(aa,bb)
     if Sig_Simeq(aa,bb) then
+        return Sig_Null;
         k := aa`k + bb`k;
         if k eq 0 then
             return Sig_Null;
