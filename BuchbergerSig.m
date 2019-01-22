@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Tue Jan 22 09:31:08 2019
-// Hash: f791a494bf535835675f747367705c37
+// Last modified: Tue Jan 22 11:07:11 2019
+// Hash: 4819159a7caa5c9e2ccc02838639ae2b
 
 load "Signatures.m";
 
@@ -155,7 +155,7 @@ function Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
     Si := Sig_Multiply(sigs[i],1,T[j][i] div LeadingMonomial(G[i]));
     Sj := Sig_Multiply(sigs[i],1,T[j][i] div LeadingMonomial(G[j]));
     Sk := Sig_Multiply(sigs[i],1,T[j][i] div LeadingMonomial(G[k]));
-    return Sig_Geq(Si,Sk) or Sig_Geq(Sj,Sk);
+    return Sig_Lt(Sk,Si) or Sig_Lt(Sk,Sj);
 end function;
 
 function IsEqualUpToUnit(a,b)
@@ -171,20 +171,11 @@ function Criterion_GebauerMoller_all(T,G,sigs,i,j,k)
         end if;
     end if;
 
-    // Comparing the LTs
-    return not (IsDivisibleBy(T[j][i],LeadingTerm(G[k])) and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k));
-    /* if Tijk eq T[j][i] then */
-    /*     ii := i; jj := j; kk := k; */
-    /* elif Tijk eq T[k][i] then */
-    /*     ii := i; jj := k; kk := j; */
-    /* elif Tijk eq T[k][j] then */
-    /*     ii := j; jj := k; kk:= j; */
-    /* else */
-    /*     return true; */
-    /* end if; */
-
-    /* // Comparing the signatures */
-    /* return not  */
+    test := IsDivisibleBy(T[j][i],LeadingTerm(G[k])) and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k);
+    
+    //printf "S-polynomial eliminated with GM-criterion: "
+               
+    return not test;
 end function;
     
 function Criterion_GebauerMoller_all_back(T,G,sigs,i,j)
@@ -522,6 +513,9 @@ function BuchbergerSig(F:
                 r := TotalStrongReduce(r,sp,SG,sigsSG : Signature := Signature);
                 printf "New basis element: sig=%o, LT=%o (from %o)\n",
                        Sig_ToString(sp), LeadingTerm(r), pp[3];
+                /* if LeadingTerm(r) eq Y^2*Z then */
+                /*     error("Found it"); */
+                /* end if; */
                 UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp,
                                  ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
                                  ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
