@@ -1,558 +1,809 @@
-// Created: Wed Dec 13 17:47:42 2017
-// Last modified: Tue Oct  9 15:35:17 2018
-// Hash: 6de1ab6d18ab8e847aa9ba5ac0ac5f9a
+// Created: Fri May  4 13:28:56 2018
+// Last modified: Sat Jan 26 11:36:22 2019
+// Hash: 801772a3d1d0e45909877bbb4b01dad9
 
 load "Signatures.m";
 
-function SatSet_of_mon(LMs,m,XS)
-    /* Returns the largest saturated set of {1..m} wrt LMs[1]...LMs[m]
-    whose lcm divides XS.
+function SPol_Sig(f1,f2,t,s1,s2)
+    /* Return a signature similar to the signature of a S-polynomial.
 
-    The output is the set of all j in {1..m} such that LMs[j] divides
-    XS.
+    The point of this function is to give a faster computation of the signature whenever an exact value is not required.
+
+    TODO: Further optimization: cache the results.
+
+    INPUT:
+    - f1, f2 two polynomials
+    - t = lcm(LT(f1),LT(f2))
+    - s1, s2 the signatures of f1 and f2 respectively
+
+    ASSUMPTION:
+    - the S-polynomial (f1,f2) is admissible
+
+    OUTPUT:
+    - s such that s \simeq sig(SPol(f1,f2))
    */
-    S := [];
-    while exists(k){k : k in [1..m] | (not k in S)
-                                      and IsDivisibleBy(XS,LMs[k])} do
-        Append(~S,k);
-    end while;
-    return S;
+    m := LeadingMonomial(t);
+    m1 := m div LeadingMonomial(f1);
+    m2 := m div LeadingMonomial(f2);
+    sf1 := Sig_Multiply(s1,1,m1);
+    sf2 := Sig_Multiply(s2,1,m2);
+    return Sig_Max(sf1,sf2);
 end function;
 
-function SatSet_lcm(S,LMs)
-    /* Given a saturated set S, returns its lcm x^S */
-    return Lcm([LMs[j] : j in S]);
+function SPol(f1,f2,t,s1,s2)
+    /* Compute a S-polynomial and its signature.
+
+    INPUT:
+    - f1, f2 two polynomials
+    - t = lcm(LT(f1),LT(f2))
+    - s1, s2 the signatures of f1 and f2 respectively
+
+    OUTPUT:
+    - f = SPol(f1,f2)
+    - s = sig(SPol(f1,f2)) if the S-polynomial is admissible and Sig_Null
+      otherwise
+    
+   */
+    t1 := t div LeadingTerm(f1);
+    t2 := t div LeadingTerm(f2);
+    mm1 := LeadingMonomial(t1);
+    cc1 := LeadingCoefficient(t1);
+    mm2 := LeadingMonomial(t2);
+    cc2 := LeadingCoefficient(t2);
+    f := cc1*mm1*f1 - cc2*mm2*f2;
+    sf1 := Sig_Multiply(s1,cc1,mm1);
+    sf2 := Sig_Multiply(s2,cc2,mm2);
+    // This excludes all singular S-polynomials
+    /* if not Sig_Simeq(sf1,sf2) then */
+    /*     sf := Sig_Max(sf1,sf2); */
+    /* else */
+    /*     sf := Sig_Null; */
+    /* end if; */
+    msf2 := Sig_Multiply(sf2,-1,1);
+    sf := Sig_Add(sf1,msf2); // Null iff strictly singular
+    return f,sf;
 end function;
 
-function SatSets_Generate(LMs,ss)
-    /* Generate all saturated sets of [1..ss] containing ss */
-    ExistingLcms := {};
-    SS := [];
-    m := ss-1;
-    /* subsets := Subsets({1..m}); */
-    /* subsets := [Include(S,ss) : S in subsets]; */
-    for size_S in [0..m] do     
-        subsets := Subsets({1..m},size_S);
-        subsets := [Sort(Append(Setseq(S),ss)) : S in subsets];
-        for S in subsets do
-            XS := SatSet_lcm(S,LMs);
-            if XS in ExistingLcms then
-                continue;
-            else
-                Include(~ExistingLcms,XS);
+function GPol(f1,f2,s1,s2)
+    /*
+    Compute a G-polynomial and its sitgnature
+
+    INPUT:
+    - f1, f2 two polynomials
+    - s1, s2 the signatures of f1 and f2 respectively
+
+    OUTPUT:
+    - f = GPol(f1,f2)
+    - s \simeq S_G(s1,s2)
+
+    NOTE:
+    - s is sig(GPol(f1,f2)) if the combination is not a signature
+    drop, or S_G(f1,f2) if it is.  Using sig(GPol(f1,f2)) whenever
+    possible makes the 1-singular criterion more efficient (against
+    G_s).
+
+    TODO: if we can implement the singular criterion with similar sig-lead ratios, we probably won't need sig(GPol(f1,f2)) anymore
+
+   */
+    m1 := LeadingMonomial(f1);
+    c1 := LeadingCoefficient(f1);
+    m2 := LeadingMonomial(f2);
+    c2 := LeadingCoefficient(f2);
+    m := Lcm(m1,m2);
+    d,a1,a2 := ExtendedGreatestCommonDivisor(c1,c2);
+    if d ne c1 and d ne c2 then
+        mm1 := m div m1;
+        mm2 := m div m2;
+        f := a1*mm1*f1 + a2*mm2*f2;
+        sf1 := Sig_Multiply(s1,a1,mm1);
+        sf2 := Sig_Multiply(s2,a2,mm2);
+        sf := Sig_Add(sf1,sf2);
+        if Sig_IsNull(sf) then
+            sf := Sig_Max(sf1,sf2);
+        end if;
+    else
+        f := Parent(f1)!0;
+        sf := s1;
+    end if;
+    return f,sf;
+end function;
+
+function LCReduce(f,sf,G,sigs : Signature := false)
+    /*
+    Implement (regular) LC reduction.
+
+    INPUT:
+    - f, sf a polynomial and its signature
+    - G a family of strong reducers
+    - sigs their respective signatures
+    - Signature (default: false): whether to require the reductions to
+      be regular
+
+    ASSUMPTION:
+    - the coefficient ring is Euclidean
+    - f is (regular) reduced modulo G
+
+    OUTPUT:
+    - g such that f = g modulo G, LM(f) = LM(g) and |LC(g)| <= |LC(f)|
+
+    NOTE:
+    - this function is not used at the moment
+    
+   */
+    
+    mf := LeadingMonomial(f);
+    N := #G;
+    for i in [1..N] do
+        g := G[i];
+        test,md :=  IsDivisibleBy(mf, LeadingMonomial(g));
+        if test and ((not Signature) or Sig_Lt(Sig_Multiply(sigs[i],1,md),sf)) then
+            cg := LeadingCoefficient(g);
+            cf := LeadingCoefficient(f);
+            cd := cf div cg;
+            cr := cf mod cg;
+            if cr lt cf and cr gt cg/2 then
+                cd +:= 1;
             end if;
-            SExt := SatSet_of_mon(LMs,ss,XS);
-            Include(~SS,SExt);
-        end for;
+            f -:= cd*md*g;
+        end if;
     end for;
-    return SS;
+    return f;
 end function;
 
+function StrongReduce(f,sf,G,sigs
+                      : Signature := false,
+                        LC_red := true)
+    /*
+    Implement (regular) top-reduction.
 
-function SatSets_Generate_with_grouping(LMs,ss)
-    /* Generate all saturated sets of [1..ss] containing ss.
+    INPUT:
+    - f, sf a polynomial and its signature
+    - G a family of strong reducers
+    - sigs their respective signatures
+    - Signature (default: false): whether to require the reductions to
+      be regular
+    - LC_red (default: true): ignored
 
-    This function implements the following optimization: it first
-    groups elements with the same LM together, and then make a call to
-    SatSets_Generate with a list of distinct LMs. The result is then
-    expanded again.
-
-    The complexity is thus exponential in the number of distinct
-    elements in LMs[1..ss], instead of exponential in ss.
+    OUTPUT:
+    - g such that f = g modulo G, LM(g) <= LM(f) and g is (regular)
+      top-reduced modulo G
    */
-    ExistingLMs := [LMs[ss]];
-    Indices := [[ss]];
-    for i in [1..ss-1] do
-        j := Index(ExistingLMs,LMs[i]);
-        /* print i,LMs[i],ExistingLMs,j; */
-        if j gt 0 then
-            Indices[j] := Append(Indices[j],i);
-        else
-            Append(~ExistingLMs,LMs[i]);
-            Append(~Indices,[i]);
-        end if;
-    end for;
-    ExistingLMs := ExistingLMs[[2..#ExistingLMs]] cat [ExistingLMs[1]];
-    printf "npols=%o\tnLMs=%o\n", ss, #ExistingLMs; 
-    Indices := Indices[[2..#Indices]] cat [Indices[1]];
-    /* print ExistingLMs; */
-    /* print Indices; */
-    SS := SatSets_Generate(ExistingLMs,#ExistingLMs);
-    SS := [Sort(&cat[Indices[i] : i in S]) : S in SS];
-    return SS;
-end function;
+    done := false;
+    while not done and f ne 0 do
+        done := true;
+        tf := LeadingTerm(f);
+        for i := 1 to #G do
+            g := G[i];
+            /* sg := sigs[i]; */
 
-function Max_sigs(sigs)
-    /* Given a set of signatures, returns the greatest one, as well as
-    the list of indices realizing this maximum. */
-    ires := [1]; res :=
-    sigs[1]; for i in [2..#sigs] do
-        if Sig_Lt(res,sigs[i]) then
-            res := sigs[i];
-            ires := [i];
-        elif Sig_Simeq(res,sigs[i]) then
-            Append(~ires,i);
-        end if;
-    end for;
-    return res,ires;
-end function;
+            /* tg := LeadingTerm(g); */
+            test,d := IsDivisibleBy(tf,LeadingTerm(g));
+            if test then
+                /* md := LeadingMonomial(d); */
+                //cd := LeadingCoefficient(d);
+n                /* sig_red := Sig_Multiply(sigs[i],(-1)*cd,md); */
+                /* sig_res := Sig_Add(sf,sig_red); */
+                if ((not Signature)
+                    or
+                    // Only regular reductions
+                    (Sig_Lt(Sig_Multiply(sigs[i],1,LeadingMonomial(d)),sf))
+                    // Only non strictly singular reductions
+                    /* (Sig_Leq(Sig_Multiply(sigs[i],1,md),sf) */
+                    /*  and not Sig_IsNull(sig_res)) */
+                   )  then
 
-function Sig_OfSatSet(S,LMs,sigs)
-    /* Computes the signature of a saturated set, together with the
-    list of indices realizing that signature. */
-    XS := SatSet_lcm(S,LMs);
-    sigsS := [Sig_Multiply(sigs[i],1,XS div LMs[i]) : i in S];
-    sig_ss,ii := Max_sigs(sigsS);
-    ss := [S[i] : i in ii];
-    return sig_ss,ss;
-end function;
+                    /* printf "%o ",i; */
+                    f -:= d * g;
+                    /* sf := sig_res; */
+                    done := false;
 
-function Sig_RegularizeSatSet(S,LMs,sigs)
-    /* Given a saturated set, computes all regular saturated sets which
-    have the same lcm */
-    sig_ss,SS := Sig_OfSatSet(S,LMs,sigs);
-    XS := SatSet_lcm(S,LMs);
-    Srest := [s : s in S | not s in SS];
-    res := [];
-    for s in SS do
-        Scand := Append(Srest,s);
-        if XS eq SatSet_lcm(Scand,LMs) then
-            Append(~res,Scand);
-        end if;
-    end for;
-    return res;
-end function;
-
-function Moller_Reduce(gg,sigG,ss,pols,sigs,LMs,LCs,funs :
-                       Criterion := true,
-                       Tail := true)
-    /* Implements weak reduction of gg, with signature sigG, wrt
-    module elements alpha_1..alpha_ss. The alpha_i's are given with
-    their signature sigs[i] and their polynomial pols[i].
-    
-    For all i in [1..ss], LMs[i] = LeadingMonomial(pols[i]) and LCs[i] = LeadingCoefficient(pols[i]).
-
-    Optional parameters:
-    - Criterion: True iff we only do regular reductions (if false, the contents of sigG and sigs are ignored) 
-    - Tail: True iff we want to reduce beyond the leading coefficient of gg (it makes the algorithm more efficient and the output more readable)
-   */
-    
-    SatIdeal,CosetRep,LinDecomp := Explode(funs);
-    reducible := true;
-    m := #pols;
-    sing_red := false;
-    g := gg;
-    res := 0;
-    first := true;
-    main_term := 0;
-    
-    while first or (Tail and g ne 0) do
-        first := false;
-        reducible := true;
-        while reducible do
-            /* print(g); */
-            if g eq 0 then
-                reducible := false;
-                break;
-            end if;
-            lm := LeadingMonomial(g);
-            S := SatSet_of_mon(LMs,m,lm);
-            
-            if Criterion then
-                done := false;
-                while not IsEmpty(S) and not done do
-
-                    XS := LeadingMonomial(g);
-                    sigsS := [Sig_Multiply(sigs[i],1,XS div LMs[i]) : i in S];
-                    
-                    if exists(iii){i : i in [1..#S]
-                                   | Sig_Simeq(sigsS[i],sigG)
-                                     or Sig_Lt(sigG,sigsS[i])} then
-                        
-                        Remove(~S,iii);
+                    /* break; */
+                    if f eq 0 then
+                        break; // Break for, so go back to the beginning of the while
                     else
-                        done := true;
+                        tf := LeadingTerm(f); // It seems to be better to continue through the list here. Why?
                     end if;
-                end while;
-            end if;
-            
-            if IsEmpty(S) then
-                /* Then we cannot reduce any more */
-                reducible := false;
-            else     
-                LC_S := [LCs[j] : j in S];
-                lc := LeadingCoefficient(g);
-                lc_red := CosetRep(LC_S,lc);
-                /* printf "S=%o, LC_S=%o, lc=%o, lc_red=%o\n", S, LC_S,lc,lc_red; */
-                if lc_red ne 0 then
-                    /* We cannot eliminate the leading coefficient, so we
-                mark the polynomial as irreducible and we perform one
-                last reduction step to bring the LC to coset
-                representative form */
-                    reducible := false;
-                    lc := lc-lc_red;
                 end if;
-                
-                bb := LinDecomp(LC_S,lc);
-                for j in [1..#LC_S] do
-                    ii := S[j];
-                    g -:= bb[j]*(lm div LMs[ii])*pols[ii];
-                end for;
             end if;
-        end while;
-        if Tail then
-            res +:= LeadingTerm(g);
-            g -:= LeadingTerm(g);
-        else
-            res := g;
-        end if;
+        end for;
     end while;
+
+    /* if LC_red and f ne 0 then */
+    /*     f := LCReduce(f,sf,G,sigs : Signature := Signature); */
+    /* end if; */
+    
+    /* printf "\n"; */
+    return f;
+end function;
+
+function TotalStrongReduce(f,sf,G,sigs 
+                           : Signature := false)
+    /*
+    Implement (regular) reduction (including tail coefficients).
+
+    INPUT:
+    - f, sf a polynomial and its signature
+    - G a family of strong reducers
+    - sigs their respective signatures
+    - Signature (default: false): whether to require the reductions to
+      be regular
+
+    OUTPUT:
+    - g such that f = g modulo G, LM(g) <= LM(f) and g is totally
+      (regular) reduced modulo G
+   */
+
+    
+    res := 0;
+    ff := f;
+    /* sff := sf; */
+    while ff ne 0 do
+        ff := StrongReduce(ff,sf,G,sigs : Signature := Signature);
+        res +:= LeadingTerm(ff);
+        ff -:= LeadingTerm(ff);
+    end while;
+
     return res;
 end function;
 
+/* function StrongReduce(f,G) */
+/*     return NormalForm(f,G); */
+/* end function; */
 
-function Sig_F5Criterion(sig_ss,ss,LMs,LCs,sigs,interm_ideals,funs)
-    /* True iff the signature sig_ss satisfies the F5 criterion (and
-    should be kept)
+function Criterion_Coprime(f,g)
+    /* Implement the coprime criterion.
 
-    That is, if sig_ss = k*m*e_i, it is True iff k*m is not reducible
-    modulo a basis of the initial ideal of <f_1...f_(i-1)>. This basis
-    is recovered from LMs and LCs (respectively the LMs and LCs of
-    already computed elements) and interm_ideals[i-1] (which holds the
-    index of the last polynomial in the basis with signature
-    #*#*e_(i-1)).
+    INPUT:
+    - f,g two polynomials
+
+    OUTPUT:
+    - true if and only if the S-pair (f,g) should not be eliminated with the coprime criterion    
+    
    */
     
-    if sig_ss`i eq 1 then
+    return Gcd(LeadingMonomial(f),LeadingMonomial(g)) ne 1;
+end function;
+
+function Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
+    /* Implement the signature check for the chain criterion
+
+    INPUT:
+    - T cache of lcm(leading terms) (see the description of
+      algo. SigMoller)
+    - G currently constructed basis
+    - sigs their respective signatures
+    - i,j,k integers at most #G
+
+    ASSUMPTION:
+    - T(k) divides T(i,j)
+
+    OUTPUT:
+    - true if and only S(i,j) >= T(i,j)/T(k) S(k)
+
+   */
+    
+    if i eq k or j eq k or i eq j then
+        return false;
+    end if;
+    if i gt j then
+        tmp := i; i := j; j := tmp;
+    end if;
+    mji := LeadingMonomial(T[j][i]);
+    Si := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[i]));
+    Sj := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[j]));
+    Sk := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[k]));
+    return Sig_Leq(Sk,Si) or Sig_Leq(Sk,Sj);
+end function;
+
+function IsEqualUpToUnit(a,b)
+    /* Implement comparison of polynomials up to an invertible
+
+    INPUT:
+    - a,b two polynomials
+
+    OUTPUT:
+    - true iff a = u*b with u an invertible scalar
+
+    NOTE:
+    - this function is not used anywhere
+    
+   */
+    return IsDivisibleBy(a,b) and IsUnit(a div b);
+end function;
+
+function Criterion_GebauerMoller_all(T,G,sigs,i,j,k)
+    /* Implement the chain criterion with signatures
+
+    INPUT:
+    - T cache of lcm(leading terms) (see the description of
+      algo. SigMoller)
+    - G currently constructed basis
+    - sigs their respective signatures
+    - i,j,k integers at most #G
+
+    OUTPUT:
+    - true if and only Chain(i,j;k) does not hold
+   */
+    if #{i,j,k} lt 3 then
+        return true;
+    else
+        if i gt j then
+            tmp := i; i := j; j := tmp;
+        end if;
+    end if;
+
+    test := IsDivisibleBy(T[j][i],LeadingTerm(G[k])) and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k);
+    
+    //printf "S-polynomial eliminated with GM-criterion: "
+               
+    return not test;
+end function;
+    
+function Criterion_GebauerMoller_all_back(T,G,sigs,i,j)
+    /* Implement the chain criterion with signatures, looking back for
+    a k
+
+    INPUT:
+    - T cache of lcm(leading terms) (see the description of
+      algo. SigMoller)
+    - G currently constructed basis
+    - sigs their respective signatures
+    - i,j integers at most #G
+
+    OUTPUT:
+    - true if and only for all k <= #G, Chain(i,j;k) does not hold
+   */
+    test := true;
+    for k in [1..j-1] do
+        if not Criterion_GebauerMoller_all(T,G,sigs,i,j,k) then
+            test := false;
+            break;
+        end if;
+    end for;
+    return test;
+end function;
+        
+
+
+function Criterion_GebauerMoller_B(T,G,sigs,i,j,k)
+    /* Implements Gebauer-Möller's "B" criterion.
+
+    NOTE:
+    - this function is not called at the moment, but it should be called whenever we use the algorithms without signatures.
+   */
+       
+    if i eq k or j eq k then
         return true;
     end if;
-    lpols := [LCs[i]*LMs[i] : i in [1..interm_ideals[sig_ss`i]-1]];
-    mon := sig_ss`k * sig_ss`mu;
-    mon_red := Moller_Reduce(mon,0,ss,lpols,sigs,LMs,LCs,funs : Criterion := false);
-    return mon_red ne 0;
+    test := true;
+    /* Sij := SPol_Sig(G[i],G[j],T[j][i],sigs[i],sigs[j]); */
+    /* Sjk := SPol_Sig(G[i],G[k],T[k][i],sigs[i],sigs[k]); */
+    /* Sik := SPol_Sig(G[j],G[k],T[k][j],sigs[j],sigs[k]); */
+    /* Tijk := Lcm(T[j][i],LeadingTerm(G[k])); */
+    test := j ge k
+                     /* or Sig_Lt(Sij, Sig_Multiply(Sik, 1, Tijk div T[k][i])) */
+                     /* or Sig_Lt(Sij, Sig_Multiply(Sjk, 1, Tijk div T[k][j])) */
+            or (not(IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
+                                /* and LeadingMonomial(T[k][i]) ne LeadingMonomial(T[j][i]) */
+                                /* and LeadingMonomial(T[k][j]) ne LeadingMonomial(T[j][i]) */
+                   and (T[k][i]) ne (T[j][i])
+                   and (T[k][j]) ne (T[j][i])
+                  ))
+            or (not Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k))
+    ;
+    return test;
 end function;
-
-
-function SatSets_Generate_maybe_regular(ss,LMs,sigs
-                                        : Criterion := true)
-    /* Generates (regular) saturated sets of [1..ss]
-
-    Optional parameters:
-    - Criterion: if false, just compute all saturated sets,
-      disregarding the signatures
-   */
     
-    new_satsets := SatSets_Generate_with_grouping(LMs,ss);
-    /* print "New candidate satsets:", new_satsets; */
-    if Criterion then
-        /* If we are computing with signatures, we need to extend the
-        set of saturated sets whenever we add a polynomial to the
-        basis */
+function Criterion_GebauerMoller_M(T,G,sigs,i,k)
+    /* Implements Gebauer-Möller's "M" criterion.
 
-        res := [];
-        for S in new_satsets do
-            res cat:= Sig_RegularizeSatSet(S,LMs,sigs);
-        end for;
-        new_satsets := res;
-    end if;
-    return new_satsets;
-end function;
-
-
-function OneSingularReducible(g,SigG,sigs,LMs,ss)
-    /* Test if a candidate basis element is 1-singular reducible.
-
-    Implementation of 1-SingularReducible (Algorithm 4)
+    NOTE:
+    - this function is not called at the moment, but it should be called whenever we use the algorithms without signatures.
    */
-    LMg := LeadingMonomial(g);
-    test := exists{j : j in [1..ss-1] | IsDivisibleBy(LMg,LMs[j])
-                                        and ((LMg div LMs[j])*(sigs[j]`mu))
-                                            eq SigG`mu
-                                        and sigs[j]`i eq SigG`i
-                                        and IsDivisibleBy(SigG`k,sigs[j]`k) };
+
+    test := true;
+
+    /* if i gt j then */
+    /*     i,j := Explode(<j,i>); */
+    /* end if; */
+
+    for j in [1..k-1] do
+        if i eq j then // Can't satisfy the criterion in that case anyway
+            continue;
+        elif i gt j then
+            Tji := T[i][j];
+        else
+            Tji := T[j][i];
+        end if;
+        /* if i lt j then */
+        /*     Sij := SPol_Sig(G[i],G[j],T[j][i],sigs[i],sigs[j]); */
+        /* else */
+        /*     Sij := SPol_Sig(G[i],G[j],T[i][j],sigs[i],sigs[j]); */
+        /* end if;            */
+        /* Sjk := SPol_Sig(G[i],G[k],T[k][i],sigs[i],sigs[k]); */
+        /* Sik := SPol_Sig(G[j],G[k],T[k][j],sigs[j],sigs[k]); */
+        /* Tijk := Lcm(T[k][i],LeadingTerm(G[j])); */
+
+        if /* Sig_Geq(Sij, Sig_Multiply(Sik, 1, Tijk div T[k][i])) */
+            /* and Sig_Geq(Sij, Sig_Multiply(Sjk, 1, Tijk div T[k][j])) */
+            IsDivisibleBy(Tji,T[k][j])
+                         /* and LeadingMonomial(T[k][i]) ne LeadingMonomial(T[k][j]) */
+            and (T[k][j]) ne (Tji)
+            and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
+            then
+            test := false;
+            break;
+        end if;
+    end for;
     return test;
 end function;
 
-function Moller_GB (F,funs :
-                    Signature := true,
-                    F5_Criterion := true,
-                    Sing_Criterion := true)
-    /*
-    Compute a Gröbner basis of F.
+function Criterion_GebauerMoller_F(T,G,sigs,i,k)
+    /* Implements Gebauer-Möller's "F" criterion.
 
-    funs are the required algorithms for the base ring: SatIdeal,
-    CosetRep and LinDecomp.  CosetRep is not described in the paper,
-    for applicable rings it gives the possibility to perform "total
-    reductions", giving to each Leading Coefficient a unique
-    representation modulo the leading coefficient of candidate
-    reducers.
-
-    For example over ZZ, the Euclidean remainder can be used, and over
-    a multivariate polynomial ring, the Normal Form modulo a Gröbner basis.
-
-    When not applicable, a generic "do-nothing" CosetRep function is provided.
-
-    Optional parameters:
-    - Signature: True iff we want to compute a signature Gröbner basis (if false, the algorithm is just the classical version of Möller's algorithm)
-    - F5_Criterion: True iff we want to exclude S-vectorsets using the F5 criterion
-    - Sing_Criterion: True iff we want to exclude S-vectorsets using the singular criterion
+    NOTE:
+    - this function is not called at the moment, but it should be called whenever we use the algorithms without signatures.
    */
-                   
-    SatIdeal,CosetRep,LinDecomp := Explode(funs);
-    pols := [];
-    sigs := [];
-    LMs := [];
-    LCs := [];
-    interm_ideals := [];
-    m := #F;
-    ss := 1;
-    cnt_vectsets := 0;
-    cnt_satsets := 0;
-    cnt_red0 := 0;
-    cnt_sing_pairs := 0;
-    cnt_1sing_red := 0;
-    cnt_F5_pairs := 0;
-    SS := [];
-    prev_sig := Sig_Create(1,1,1);
-    for i in [1..m] do
-        sigi := Sig_Create(1,1,i);
-        fred := Moller_Reduce(F[i],sigi,ss,pols,sigs,LMs,LCs,funs :
-                              Criterion := Signature);
-        
-        if fred eq 0 then
-            printf "F[%o] reduces to 0\n", i;
-            Append(~interm_ideals,#pols);
-            printf "i=%o, interm_ideals=%o\n",i,interm_ideals;
-            continue;
-            // In this case we completely skip this polynomial
-        end if;
-        Append(~pols,fred);
-        Append(~sigs,sigi);
-        Append(~LMs, LeadingMonomial(fred));
-        Append(~LCs, LeadingCoefficient(fred));
-        Append(~interm_ideals,#pols);
-        printf "i=%o, interm_ideals=%o\n",i,interm_ideals;
-
-        new_satsets :=
-            SatSets_Generate_maybe_regular(#pols,LMs,sigs
-                                           :Criterion := Signature);
-        printf "Adding %o new saturated sets\n", #new_satsets;
-        SS cat:= new_satsets;
-        SS := Setseq(Seqset(SS)); /* Eliminate duplicates */
-
-        
-        while not IsEmpty(SS) do
-            printf "#SS=%o\n", #SS;
-            if Signature then
-                Sort(~SS,func<S1,S2 | Sig_Compare(Sig_OfSatSet(S1,LMs,sigs),
-                                                  Sig_OfSatSet(S2,LMs,sigs))>);
-            end if;
     
-            /* If we are using the signature algorithm, SS is sorted by increasing signatures */
-            S := SS[1];
-            Remove(~SS,1);
-            print "S=", S;
+    test := true;
+    for j in [1..i-1] do
+        /* Sij := SPol_Sig(G[i],G[j],T[i][j],sigs[i],sigs[j]); */
+        /* Sjk := SPol_Sig(G[i],G[k],T[k][i],sigs[i],sigs[k]); */
+        /* Sik := SPol_Sig(G[j],G[k],T[k][j],sigs[j],sigs[k]); */
+        /* Tijk := Lcm(T[k][i],LeadingTerm(G[i])); */
 
-            if Signature then
-                sigS,smax := Sig_OfSatSet(S,LMs,sigs);
-                ss := smax[1];
-            else
-                ss := Max(S);
-            end if;
-            
-            if #S eq 1 then
-                continue;
-            end if;
-
-            cnt_satsets +:= 1;
-            
-            XS := SatSet_lcm(S,LMs);
-
-            /* ss := Max(S); */
-            f_current := pols[ss];
-            lm_current := LeadingMonomial(f_current);
-            
-            Srest := [j : j in S | j ne ss];
-            LC_S := [LCs[j] : j in Srest];
-            gens := SatIdeal(LC_S,LCs[ss]);
-            for b_S in gens do
-                if Signature then
-                    SigG := Sig_Multiply(sigS,b_S,1);
-                    printf "Signature of saturated set: %o\n",
-                           Sig_ToString(SigG);
-                    if Sing_Criterion and exists{s : s in sigs | Sig_Eq(s,SigG)} then
-                        printf "Polynomial excluded by singular criterion\n";
-                        cnt_sing_pairs +:= 1;
-                        continue;
-                    elif F5_Criterion
-                         and not Sig_F5Criterion(SigG,ss,LMs,LCs,sigs,
-                                                 interm_ideals,funs) then
-                        printf "Polynomial excluded by F5 criterion\n";
-                        cnt_F5_pairs +:= 1;
-                        continue;
-                    end if;
-                else
-                    SigG := 0; // Arbitrary, for the call to reduce
-                end if;
-
-                cnt_vectsets +:= 1;
-                
-                bb := LinDecomp(LC_S,b_S*LCs[ss]);
-                g := b_S*(XS div lm_current) * f_current;
-                /* print LC_S,S; */
-                for j in [1..#LC_S] do
-                    ii := Srest[j];
-                    g -:= bb[j]
-                          *(XS div LeadingMonomial(pols[ii]))
-                          *pols[ii];
-                end for;
-                gg := Moller_Reduce(g,SigG,ss,pols,sigs,LMs,LCs,funs
-                                    : Criterion := Signature);
-
-                if gg eq 0 then
-                    /* Regular syzygy */
-                    
-                    printf "Reduction to 0\n";
-                    cnt_red0 +:= 1;
-                    //error "";
-                elif Signature and OneSingularReducible(g,SigG,sigs,LMs,ss) then
-                    /* 1-Singular reducible */
-                    
-                    printf "1-singular reducible: %o\n", gg;
-                    cnt_1sing_red +:= 1;
-                else
-                    /* Otherwise: added to the basis */
-
-                    if Signature then
-                        printf "Adding %o with signature (%o,%o,%o)\n",
-                               gg, SigG`k,SigG`mu,SigG`i;
-                    end if;
-                    Append(~pols,gg);
-                    if Signature then
-                        Append(~sigs,SigG);
-                    end if;
-                    Append(~LMs, LeadingMonomial(gg));
-                    Append(~LCs, LeadingCoefficient(gg));
-                    new_satsets :=
-                        SatSets_Generate_maybe_regular(#pols,LMs,sigs
-                                                       :Criterion := Signature);
-                    printf "Adding %o new saturated sets\n", #new_satsets;
-                    SS cat:= new_satsets;
-                    SS := Setseq(Seqset(SS)); /* Eliminate duplicates */
-
-                end if;
-            end for;
-        end while;
+        if T[i][j] eq T[k][i]
+           /* and Sig_Geq(Sij, Sig_Multiply(Sik, 1, Tijk div T[k][i])) */
+                       /* and Sig_Geq(Sij, Sig_Multiply(Sjk, 1, Tijk div T[k][j]))      */
+           and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
+            then
+            test := false;
+            break;
+        end if;
     end for;
-    printf "Total # of vectorsets: %o\n", cnt_vectsets;
-    printf "Total # of saturated sets: %o\n", cnt_satsets;
-    printf "Total # of reductions to 0: %o\n", cnt_red0;
-    printf "Total # of skipped singular S-pairs: %o\n", cnt_sing_pairs;
-    printf "Total # of skipped F5 S-pairs: %o\n", cnt_F5_pairs;
-    printf "Total # of skipped 1-singular-reducible pols: %o\n", cnt_1sing_red;
-    return pols,sigs;
+    return test;
 end function;
 
-function Moller_ReduceGB(G,funs)
-    /* Given a Gröbner basis, compute a reduced Gröbner basis */
-    
-    finished := false;
-    while not finished do
-        while 0 in G do
-            Exclude(~G,0);
-        end while;
-        done_anything := false;
-        for i in [1..#G] do
-            rest := [j : j in [1..#G] | j ne i];
-            pols := [G[j] : j in rest];
-            LMs := [LeadingMonomial(G[j]) : j in rest];
-            LCs := [LeadingCoefficient(G[j]) : j in rest];
-            gg := Moller_Reduce(G[i],0,#G,pols,[],LMs,LCs,funs
-                                : Criterion := false);
-            if gg ne G[i] then
-                done_anything := true;
-                G[i] := gg;
-                if gg eq 0 then
-                    break;
-                end if;
-            end if;
-        end for;
-        if not done_anything then
-            finished := true;
+/* function Criterion_GH_C1 */
+
+function Criterion_1SingularReducible(f,sf,G,sigs)
+    /* Test whether f is 1-singular reducible modulo G
+
+    INPUT:
+    - f a polynomial
+    - sf its signature
+    - G a family of reducers
+    - sigs their respective signatures
+
+    ASSUMPTION:
+    - f is regular reduced modulo G
+
+    OUTPUT:
+    - true if and only if f is 1-singular reducible modulo G    
+   */
+
+    test := false;
+    tf := LeadingTerm(f);
+    mf := LeadingMonomial(f);
+    cf := LeadingCoefficient(f);
+
+    for i in [1..#G] do
+        g := G[i];
+        sg := sigs[i];
+        test2, mmg := IsDivisibleBy(mf,LeadingMonomial(g));
+        if test2
+           and sg`i eq sf`i
+           and (sg`mu * mmg) eq sf`mu
+           and IsDivisibleBy(sf`k,sg`k) then
+            test := true;
+            break;
         end if;
-    end while;
-    return G;
+
+        /* test2, ttg := IsDivisibleBy(tf,LeadingTerm(g)); */
+        /* if test2 then */
+        /*     ccg := LeadingCoefficient(ttg); */
+        /*     mmg := LeadingMonomial(ttg); */
+        /*     if Sig_Eq(Sig_Multiply(sg,ccg,mmg),sf) then */
+        /*         test := true; */
+        /*         break; */
+        /*     end if; */
+        /* end if; */
+                
+        /* if IsDivisibleBy(tf,LeadingTerm(g)) then */
+        /*     mmg := mf div LeadingMonomial(g); */
+        /*     ccg := cf div LeadingCoefficient(g); */
+        /*     s := Sig_Multiply(sg,ccg,mmg); */
+        /*     if Sig_Simeq(sf,s) then */
+        /*         // QUESTION: Why does it work better with simeq? */
+        /*     /\* if sg`i eq sf`i and sg`mu*mmg eq sf`mu and IsDivisibleBy(sf`k,sg`k) then *\/ */
+        /*         test := true; */
+        /*         break; */
+        /*     end if; */
+        /* end if; */
+    end for;
+    return test;
 end function;
 
-
-/* Implementation of the ring procedures */
+function Criterion_F5(f,sf,G,sigs)
+    /* Implement the F5 criterion
 
+    INPUT:
+    - f a polynomial
+    - sf its signature
+    - G the currently constructed basis
+    - sigs their respective signatures
 
-// Functions for euclidian rings
-
-function Euclid_SatIdeal(F,g)
-    d := Gcd(F);
-    m := Lcm(d,g);
-    return [m div g];
-end function;
-
-function Euclid_CosetRep(F,g)
-    res := g mod (Gcd(F));
+    OUTPUT:
+    - true if and only if f should be kept after applying the F5 criterion 
+    
+   */
+    
+    if sf`i eq 1 then
+        return true;
+    end if;
+    slim := Sig_Create(1,1,sf`i);
+    LPols := [LeadingTerm(G[i])
+              : i in [1..#G]
+              | Sig_Lt(sigs[i],slim)];
+    mon := sf`k * sf`mu;
+    mon_red := StrongReduce(mon,sf,LPols,sigs : Signature:=false, LC_red := false);
+    res := mon_red ne 0;
+    /* printf "Criterion_F5: testing %o\n",Sig_ToString(sf); */
+    /* if sf`i eq 3 and sf`k eq -1 and sf`mu eq (Parent(f).1)^2 then */
+    /*     Error("Time to check"); */
+    /* end if; */
     return res;
 end function;
 
-function Euclid_LinDecomp(F,g)
-    d,bb := ExtendedGreatestCommonDivisor(F);
-    if g mod d ne 0 then
-        error "Not divisible";
-    else
-        dd := g div d;
-        return [b*dd : b in bb];
+function Criterion_Singular(f,sf,G,sigs)
+    /* Implement the singular criterion
+
+    INPUT:
+    - f a polynomial (ignored)
+    - sf its signature
+    - G the currently constructed Gröbner basis
+    - sigs their respective signatures
+
+    OUTPUT:
+    - true if and only if no element in G has exactly the same signature as f
+   */
+    
+    test := exists{s : s in sigs | s`i eq sf`i
+                                   and s`mu eq sf`mu
+                                   and s`k eq sf`k
+                                   /* and IsDivisibleBy(sf`k,s`k) */};
+    return not test;
+end function;
+
+
+
+procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
+                           ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
+                           ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
+                           ~cnt_pairs,~cnt_Spairs
+                           : Signature := false, GebauerMoller := false)
+    /* Implement the procedure "Update": update the two Gröbner bases, the list of pairs and the caches
+
+    INPUT:
+    - P the current list of S-pairs
+    - G the current weak Gröbner basis
+    - sigs their respective signatures
+    - SG the current strong Gröbner basis
+    - sigsSG their respective signatures
+    - T the current cache of lcm(leading terms)
+    - f the polynomial to add
+    - sf its signature
+    - cnt_coprime an integer counting pairs eliminated with the
+      coprime criterion
+    - cnt_GM_B an integer counting pairs eliminated with
+      Gebauer-Möller's B criterion
+    - cnt_GM_F an integer counting pairs eliminated with
+      Gebauer-Möller's F criterion
+    - cnt_GM_M an integer counting pairs eliminated with
+      Gebauer-Möller's M criterion
+    - cnt_GM_all an integer counting pairs eliminated with the chain
+      criterion with signatures
+    - cnt_GH_C1,cnt_GH_C2,cnt_GH_C3 integers which are ignored
+    - cnt_pairs an integer counting how many pairs are considered
+    - cnt_Spairs an integer counting how many pairs are added to P
+
+    ACTION:
+    - the list of pairs P is updated
+    - the weak Gröbner basis and its signatures are updated
+    - the strong Gröbner basis and its signatures are updated
+    - T is updated
+    - the counters are updated
+   */
+    
+    // Updating the weak basis
+    Append(~G,f);
+    N := #G;
+    Append(~sigs,sf);
+
+    // Updating T
+    Append(~T,[]);
+    t := LeadingTerm(f);
+    for i in [1..N-1] do
+        Append(~T[N],Lcm(LeadingTerm(G[i]),t));
+    end for;
+    cnt_pairs +:= N;
+    
+    // Updating the list of critical pairs
+    for i in [1..N-1] do
+        if not Criterion_Coprime(f,G[i]) then
+            cnt_coprime +:= 1;
+            cnt_GH_C1 +:= 1;
+        elif GebauerMoller and not Criterion_GebauerMoller_all_back(T,G,sigs,i,N) then
+            cnt_GM_all +:= 1;
+        /* elif GebauerMoller and not Criterion_GH_C2(T,G,sigs,i,N) then */
+        /*     cnt_GH_C2 +:= 1; */
+        /* elif GebauerMoller and not Criterion_GH_C3(T,G,sigs,i,N) then */
+            /*     cnt_GH_C3 +:= 1; */
+        /* elif GebauerMoller and not Criterion_GebauerMoller_M(T,G,sigs,i,N) then */
+        /*     cnt_GM_M +:= 1; */
+        /* elif GebauerMoller and not Criterion_GebauerMoller_F(T,G,sigs,i,N) then */
+        /*     cnt_GM_F +:= 1; */
+        else
+            cnt_Spairs +:= 1;
+            p,sp := SPol(f,G[i],T[N][i],sf,sigs[i]);
+            if p ne 0 and (not Signature or not Sig_IsNull(sp)) then
+                Append(~P,<p,sp,<i,N>>);
+            end if;
+        end if;
+    end for;
+    
+    if Signature then
+        Sort(~P, func<P1,P2 | Sig_Compare_Full(P1[2],P2[2])>);
     end if;
+
+    if GebauerMoller then
+        toRemove := [];
+        for k in [1..#P] do
+            pp := P[k];
+            ii,jj := Explode(pp[3]);
+            if not Criterion_GebauerMoller_all(T,G,sigs,ii,jj,N) then
+            /* if not Criterion_GebauerMoller_B(T,G,sigs,ii,jj,N) then */
+                /* printf "Removed pair due to Gebauer-Moller B criterion\n"; */
+                cnt_GM_all +:= 1;
+                Append(~toRemove,k);
+            end if;
+        end for;
+        for k in Reverse(toRemove) do
+            Remove(~P,k);
+        end for;
+    end if;
+        
+    // Updating the strong basis
+    Append(~SG,f);
+    Append(~sigsSG,sf);
+    for i in [1..#SG-1] do
+        p,sp := GPol(f,SG[i],sf,sigsSG[i]);
+        if p ne 0 /* and (not Signature or not Sig_IsNull(sp)) */ then
+            Append(~SG,p);
+            Append(~sigsSG,sp);
+        end if;
+    end for;
+end procedure;
+
+function BuchbergerSig(F:
+                    Signature := true,
+                    F5_Criterion := true,
+                    Sing_Criterion := true,
+                    GebauerMoller := true)
+
+    if not Signature then
+        F5_Criterion := false;
+        Sing_Criterion := false;
+    end if;
+    
+    cnt_coprime := 0;
+    cnt_F5 := 0;
+    cnt_GM_B := 0;
+    cnt_GM_M := 0;
+    cnt_GM_F := 0;
+    cnt_GM_all := 0;
+    cnt_GH_C1 := 0;
+    cnt_GH_C2 := 0;
+    cnt_GH_C3 := 0;
+    cnt_1sing_red := 0;
+    cnt_sing := 0;
+    cnt_syz := 0;
+    cnt_pairs := 0;
+    cnt_Spairs := 0;
+    
+    G := [];
+    SG := [];
+    P := [];
+    sigs := [];
+    sigsSG := [];
+    T := []; // T[j][i] is the lcm of the LT of G[i] and G[j]
+    m := #F;
+    A := Parent(F[1]);
+    for i in [1..m] do
+        printf "############ i=%o ##############\n",i;
+
+        if i gt 1 then
+            SG := ReduceGroebnerBasis(SG);
+            sigsSG := [Sig_Create(1,1,i-1) : g in SG];
+            G := SG;
+            sigs := sigsSG;
+            T := [[] : g in SG];
+        end if;
+        
+        f := F[i]; // We get a wrong result if we reduce first???
+        sf := Sig_Create(1,1,i);
+        f := TotalStrongReduce(f,sf,SG,sigsSG
+                               : Signature := Signature); 
+        if f eq 0 then
+            continue;
+        end if;
+        UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
+                         ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
+                         ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
+                         ~cnt_pairs,~cnt_Spairs
+                         : Signature := Signature,
+                           GebauerMoller := GebauerMoller);
+        while #P gt 0 do
+            printf "#P=%o #G=%o\n", #P, #G;
+            next := 1; 
+            pp := P[next]; Remove(~P,next);
+            p := pp[1]; sp := pp[2];
+            if Signature then
+                if (F5_Criterion
+                    and not Criterion_F5(p,sp,SG,sigsSG)) then
+                    printf "Polynomial excluded by F5 criterion\n"/* : sig=%o\n", Sig_ToString(sp) *//* , LeadingTerm(p) */;
+                    cnt_F5 +:= 1;
+                    continue;
+                elif (Sing_Criterion
+                      and not Criterion_Singular(p,sp,G,sigs)) then
+                    printf "Polynomial excluded by Singular criterion\n";
+                    cnt_sing +:= 1;
+                    continue;
+                end if;
+            end if;
+            
+            r := StrongReduce(p,sp,SG,sigsSG
+                              : Signature := Signature, LC_red := false);
+            if r eq 0 then
+                printf "Reduction to zero: sig=%o\n", Sig_ToString(sp);
+                cnt_syz +:= 1;
+            elif Signature
+                 and Criterion_1SingularReducible(r,sp,SG,sigsSG) then
+                printf "Basis element excluded because 1-singular reducible\n";
+                cnt_1sing_red +:= 1;
+            else
+                r := TotalStrongReduce(r,sp,SG,sigsSG : Signature := Signature);
+                printf "New basis element: sig=%o, LT=%o\n",
+                       Sig_ToString(sp), LeadingTerm(r);//, pp[3];
+                /* if LeadingTerm(r) eq Y^2*Z then */
+                /*     error("Found it"); */
+                /* end if; */
+                UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp,
+                                 ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
+                                 ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
+                                 ~cnt_pairs,~cnt_Spairs
+                                 : Signature := Signature,
+                                   GebauerMoller := GebauerMoller);
+            end if;
+        end while;
+    end for;
+
+    printf "Total # of S-polynomials: %o\n", cnt_Spairs;
+    printf "Total # of considered pairs: %o\n", cnt_pairs;
+    printf "Total # of reductions to 0: %o\n", cnt_syz;
+    printf "Total # of skipped pairs with coprime criterion: %o\n", cnt_coprime;
+    printf "Total # of skipped pairs with Gebauer-Moller criteria: %o\n", cnt_GM_all;
+    /* printf "Total # of skipped pairs with Gebauer-Moller \"B\" criterion: %o\n", cnt_GM_B; */
+    /* printf "Total # of skipped pairs with Gebauer-Moller \"M\" criterion: %o\n", cnt_GM_M; */
+    /* printf "Total # of skipped pairs with Gebauer-Moller \"F\" criterion: %o\n", cnt_GM_F; */
+    /* printf "Total # of skipped pairs with Gerdt-Hashemi \"C1\" criterion: %o\n", cnt_GH_C1; */
+    /* printf "Total # of skipped pairs with Gerdt-Hashemi \"C2\" criterion: %o\n", cnt_GH_C2; */
+    /* printf "Total # of skipped pairs with Gerdt-Hashemi \"C3\" criterion: %o\n", cnt_GH_C3; */
+    printf "Total # of skipped pairs with F5 criterion: %o\n", cnt_F5;
+    printf "Total # of skipped pairs with sing criterion: %o\n", cnt_sing;
+    printf "Total # of skipped 1-singular-reducible pols: %o\n", cnt_1sing_red;
+    
+    return G,SG,sigs,sigsSG,T;    
 end function;
 
-
-// Functions for fields
 
-function Field_SatIdeal(F,g)
-    return [1];
-end function;
-
-function Field_CosetRep(F,g)
-    return 0;
-end function;
-
-function Field_LinDecomp(F,g)
-    return [0 : i in [1..#F-1]] cat [g/F[#F]];
-end function;
-
-
-// Functions for multivariate polynomial rings
-
-function Pol_SatIdeal(F,g)
-    return GroebnerBasis(ColonIdeal(Ideal(F),Ideal(g)));
-end function;
-
-/*
-Behind the scenes:
-
-I : (f) = 1/f (I cap (f))
-I cap f = elim(t, t I + (1-t)f)
-*/
-
-function Pol_CosetRep(F,g)
-    return NormalForm(g,Ideal(F));
-end function;
-
-function Pol_LinDecomp(F,g)
-    I := IdealWithFixedBasis(F);
-    return Coordinates(I,g);
-end function;
-
-
-// Generic CosetRep function for rings without definite coset
-// representatives
-
-function Generic_CosetRep(F,g)
-    return g;
-end function;
