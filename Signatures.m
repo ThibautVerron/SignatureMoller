@@ -1,6 +1,6 @@
 // Created: Tue May  8 16:03:43 2018
-// Last modified: Wed Jan 16 13:59:43 2019
-// Hash: 83fb4379723e57649188fc80ebebebf6
+// Last modified: Tue Jan 22 11:50:12 2019
+// Hash: ae55b8fc35c8328ff1727094efc35863
 
 Sig := recformat<k,mu,i>;
 
@@ -83,6 +83,22 @@ function Sig_Compare(s1,s2)
         return 1;
     end if;
 end function;
+
+function Sig_Compare_Full(s1,s2)
+    /* Comparison function, suitable for Sort */
+    if Sig_Lt(s1,s2) then
+        return -1;
+    elif Sig_Simeq(s1,s2) then
+        if Abs(s1`k) lt Abs(s2`k) then
+            return -1;
+        else
+            return 1;
+        end if;
+    else
+        return 1;
+    end if;
+end function;
+
 
 function Sig_ToString(s)
     /* Convert a signature to a printable string */

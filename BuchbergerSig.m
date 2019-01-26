@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Tue Jan 22 11:07:11 2019
-// Hash: 4819159a7caa5c9e2ccc02838639ae2b
+// Last modified: Thu Jan 24 16:58:36 2019
+// Hash: cf8bbb3bfbe7fdc74200742722da7894
 
 load "Signatures.m";
 
@@ -47,7 +47,10 @@ function GPol(f1,f2,s1,s2)
         f := a1*mm1*f1 + a2*mm2*f2;
         sf1 := Sig_Multiply(s1,a1,mm1);
         sf2 := Sig_Multiply(s2,a2,mm2);
-        sf := Sig_Max(sf1,sf2);
+        sf := Sig_Add(sf1,sf2);
+        if Sig_IsNull(sf) then
+            sf := Sig_Max(sf1,sf2);
+        end if;
         // Should it be max? We don't care if strictly singular,
         // but we don't want to lose the information about the signature 
     else
@@ -68,7 +71,7 @@ function LCReduce(f,sf,G,sigs : Signature := false)
             cf := LeadingCoefficient(f);
             cd := cf div cg;
             cr := cf mod cg;
-            if cr gt cg/2 then
+            if cr lt cf and cr gt cg/2 then
                 cd +:= 1;
             end if;
             f -:= cd*md*g;
@@ -83,40 +86,46 @@ function StrongReduce(f,sf,G,sigs
     done := false;
     while not done and f ne 0 do
         done := true;
-        for i in [1..#G] do
+        tf := LeadingTerm(f);
+        for i := 1 to #G do
             g := G[i];
-            sg := sigs[i];
-            tf := LeadingTerm(f);
-            tg := LeadingTerm(g);
-            test,d := IsDivisibleBy(tf,tg);
+            /* sg := sigs[i]; */
+
+            /* tg := LeadingTerm(g); */
+            test,d := IsDivisibleBy(tf,LeadingTerm(g));
             if test then
-                md := LeadingMonomial(d);
-                cd := LeadingCoefficient(d);
+                /* md := LeadingMonomial(d); */
+                //cd := LeadingCoefficient(d);
                 /* sig_red := Sig_Multiply(sigs[i],(-1)*cd,md); */
                 /* sig_res := Sig_Add(sf,sig_red); */
                 if ((not Signature)
                     or
                     // Only regular reductions
-                    (Sig_Lt(Sig_Multiply(sigs[i],1,md),sf))
+                    (Sig_Lt(Sig_Multiply(sigs[i],1,LeadingMonomial(d)),sf))
                     // Only non strictly singular reductions
                     /* (Sig_Leq(Sig_Multiply(sigs[i],1,md),sf) */
                     /*  and not Sig_IsNull(sig_res)) */
                    )  then
+
                     /* printf "%o ",i; */
                     f -:= d * g;
                     /* sf := sig_res; */
                     done := false;
+
+                    /* break; */
                     if f eq 0 then
-                        break;
+                        break; // Break for, so go back to the beginning of the while
+                    else
+                        tf := LeadingTerm(f); // It seems to be better to continue through the list here. Why?
                     end if;
                 end if;
             end if;
         end for;
     end while;
 
-    if LC_red and f ne 0 then
-        f := LCReduce(f,sf,G,sigs : Signature := Signature);
-    end if;
+    /* if LC_red and f ne 0 then */
+    /*     f := LCReduce(f,sf,G,sigs : Signature := Signature); */
+    /* end if; */
     
     /* printf "\n"; */
     return f;
@@ -152,10 +161,11 @@ function Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
     if i gt j then
         tmp := i; i := j; j := tmp;
     end if;
-    Si := Sig_Multiply(sigs[i],1,T[j][i] div LeadingMonomial(G[i]));
-    Sj := Sig_Multiply(sigs[i],1,T[j][i] div LeadingMonomial(G[j]));
-    Sk := Sig_Multiply(sigs[i],1,T[j][i] div LeadingMonomial(G[k]));
-    return Sig_Lt(Sk,Si) or Sig_Lt(Sk,Sj);
+    mji := LeadingMonomial(T[j][i]);
+    Si := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[i]));
+    Sj := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[j]));
+    Sk := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[k]));
+    return Sig_Leq(Sk,Si) or Sig_Leq(Sk,Sj);
 end function;
 
 function IsEqualUpToUnit(a,b)
@@ -391,7 +401,7 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     end for;
     
     if Signature then
-        Sort(~P, func<P1,P2 | Sig_Compare(P1[2],P2[2])>);
+        Sort(~P, func<P1,P2 | Sig_Compare_Full(P1[2],P2[2])>);
     end if;
 
     if GebauerMoller then
@@ -460,13 +470,13 @@ function BuchbergerSig(F:
     for i in [1..m] do
         printf "############ i=%o ##############\n",i;
 
-        /* if i gt 1 then */
-        /*     SG := ReduceGroebnerBasis(SG); */
-        /*     sigsSG := [Sig_Create(1,1,i-1) : g in SG]; */
-        /*     G := SG; */
-        /*     sigs := sigsSG; */
-        /*     T := [[] : g in SG]; */
-        /* end if; */
+        if i gt 1 then
+            SG := ReduceGroebnerBasis(SG);
+            sigsSG := [Sig_Create(1,1,i-1) : g in SG];
+            G := SG;
+            sigs := sigsSG;
+            T := [[] : g in SG];
+        end if;
         
         f := F[i]; // We get a wrong result if we reduce first???
         sf := Sig_Create(1,1,i);
@@ -489,7 +499,7 @@ function BuchbergerSig(F:
             if Signature then
                 if (F5_Criterion
                     and not Criterion_F5(p,sp,SG,sigsSG)) then
-                    printf "Polynomial excluded by F5 criterion: sig=%o, LT=%o\n", Sig_ToString(sp), LeadingTerm(p);
+                    printf "Polynomial excluded by F5 criterion\n"/* : sig=%o\n", Sig_ToString(sp) *//* , LeadingTerm(p) */;
                     cnt_F5 +:= 1;
                     continue;
                 elif (Sing_Criterion
@@ -506,13 +516,13 @@ function BuchbergerSig(F:
                 printf "Reduction to zero: sig=%o\n", Sig_ToString(sp);
                 cnt_syz +:= 1;
             elif Signature
-                 and Criterion_1SingularReducible(r,sp,G,sigs) then
+                 and Criterion_1SingularReducible(r,sp,SG,sigsSG) then
                 printf "Basis element excluded because 1-singular reducible\n";
                 cnt_1sing_red +:= 1;
             else
                 r := TotalStrongReduce(r,sp,SG,sigsSG : Signature := Signature);
-                printf "New basis element: sig=%o, LT=%o (from %o)\n",
-                       Sig_ToString(sp), LeadingTerm(r), pp[3];
+                printf "New basis element: sig=%o, LT=%o\n",
+                       Sig_ToString(sp), LeadingTerm(r);//, pp[3];
                 /* if LeadingTerm(r) eq Y^2*Z then */
                 /*     error("Found it"); */
                 /* end if; */

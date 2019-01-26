@@ -1,6 +1,6 @@
 // Created: Thu Dec 14 11:25:07 2017
-// Last modified: Mon Feb  5 14:49:54 2018
-// Hash: 6664b96c5983ff3503f041867b837713
+// Last modified: Tue Oct  9 15:22:41 2018
+// Hash: 7f91f4d9d8eec30c749afa05ceb88f4e
 
 load "MollerSig.m";
 
@@ -12,12 +12,12 @@ if ring then
     
     P<X,Y,H> := PolynomialRing(IntegerRing(),3,"grevlex");
 
-    F := [3*X^2*Y + 7*Y^2*H,
-          4*X*Y^2 - 5*X^2*H,
+    F := [3*X*Y + 7*Y*H,
+          4*Y^2 - 5*X*H,
           X-2*Y+H
          ];
 
-    funs := <Euclid_SatGen, Euclid_CosetRep, Euclid_BasisCoords>;
+    funs := <Euclid_SatIdeal, Euclid_CosetRep, Euclid_LinDecomp>;
 
     time G1,S1 := Moller_GB(F,funs
                          : Signature := false,
@@ -65,7 +65,7 @@ else
           4*X*Y^2 - 5*X*H^2,
           X-2*Y+H];
 
-    funs := <Field_SatGen, Field_CosetRep, Field_BasisCoords>;
+    funs := <Field_SatIdeal, Field_CosetRep, Field_LinDecomp>;
 
     time G1 := Moller_GB(F,funs
                          : Signature := false,

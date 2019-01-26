@@ -1,6 +1,6 @@
 // Created: Tue Oct  9 14:20:56 2018
-// Last modified: Mon Jan 21 16:38:17 2019
-// Hash: 89f49bb14d16b1c757234cbbae68bd55
+// Last modified: Thu Jan 24 16:45:35 2019
+// Hash: 922d468b6a8a954c5d42b1bd77c1394c
 
 load "MollerSig.m";
 load "BuchbergerSig.m";
@@ -44,7 +44,7 @@ time G,SG := BuchbergerSig(K:
                           Signature := true,
                           F5_Criterion := true,
                           Sing_Criterion := true,
-                          GebauerMoller := false);
+                          GebauerMoller := true);
 
 SSG := ReduceGroebnerBasis(SG);
 printf "Is the weak GB Gröbner? %o\n", IsGroebner(G);
@@ -54,31 +54,46 @@ printf "Is the strong GB Gröbner? %o\n", IsGroebner(SSG);
 
 /* Katsura 3:
 
-Total # of S-polynomials: 606
-Total # of considered pairs: 990
+Magma 2.24:
+Total # of S-polynomials: 178
+Total # of considered pairs: 504
 Total # of reductions to 0: 0
-Total # of skipped pairs with coprime criterion: 340
-Total # of skipped pairs with Gebauer-Moller "B" criterion: 0
-Total # of skipped pairs with Gebauer-Moller "M" criterion: 0
-Total # of skipped pairs with Gebauer-Moller "F" criterion: 0
-Total # of skipped pairs with F5 criterion: 492
-Total # of skipped pairs with sing criterion: 10
-Total # of skipped 1-singular-reducible pols: 25
-Time: 82.810
+Total # of skipped pairs with coprime criterion: 157
+Total # of skipped pairs with Gebauer-Moller criteria: 153
+Total # of skipped pairs with F5 criterion: 115
+Total # of skipped pairs with sing criterion: 1
+Total # of skipped 1-singular-reducible pols: 6
+Time: 1.330
 
-After changing the criteria:
-
-Total # of S-polynomials: 606
-Total # of considered pairs: 990
+Magma 2.20:
+Total # of S-polynomials: 62
+Total # of considered pairs: 214
 Total # of reductions to 0: 0
-Total # of skipped pairs with coprime criterion: 340
-Total # of skipped pairs with Gebauer-Moller criteria: 0
-Total # of skipped pairs with F5 criterion: 492
-Total # of skipped pairs with sing criterion: 10
-Total # of skipped 1-singular-reducible pols: 25
-Time: 56.330
+Total # of skipped pairs with coprime criterion: 83
+Total # of skipped pairs with Gebauer-Moller criteria: 52
+Total # of skipped pairs with F5 criterion: 30
+Total # of skipped pairs with sing criterion: 0
+Total # of skipped 1-singular-reducible pols: 4
+Time: 0.060
 
+###############
 Katsura 4:
+
+Magma 2.24:
+Total # of S-polynomials: 603
+Total # of considered pairs: 1660
+Total # of reductions to 0: 0
+Total # of skipped pairs with coprime criterion: 509
+Total # of skipped pairs with Gebauer-Moller criteria: 517
+Total # of skipped pairs with F5 criterion: 388
+Total # of skipped pairs with sing criterion: 9
+Total # of skipped 1-singular-reducible pols: 84
+Time: 16.910
+
+
+
+###############
+Katsura 5:
 
 
 

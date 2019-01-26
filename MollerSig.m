@@ -1,8 +1,23 @@
 // Created: Wed Dec 13 17:47:42 2017
-// Last modified: Tue May  8 16:04:10 2018
-// Hash: f9c842112c7b3079ca04311fe4955b26
+// Last modified: Tue Oct  9 15:35:17 2018
+// Hash: 6de1ab6d18ab8e847aa9ba5ac0ac5f9a
 
 load "Signatures.m";
+
+function SatSet_of_mon(LMs,m,XS)
+    /* Returns the largest saturated set of {1..m} wrt LMs[1]...LMs[m]
+    whose lcm divides XS.
+
+    The output is the set of all j in {1..m} such that LMs[j] divides
+    XS.
+   */
+    S := [];
+    while exists(k){k : k in [1..m] | (not k in S)
+                                      and IsDivisibleBy(XS,LMs[k])} do
+        Append(~S,k);
+    end while;
+    return S;
+end function;
 
 function SatSet_lcm(S,LMs)
     /* Given a saturated set S, returns its lcm x^S */
@@ -306,6 +321,8 @@ function Moller_GB (F,funs :
         
         if fred eq 0 then
             printf "F[%o] reduces to 0\n", i;
+            Append(~interm_ideals,#pols);
+            printf "i=%o, interm_ideals=%o\n",i,interm_ideals;
             continue;
             // In this case we completely skip this polynomial
         end if;
