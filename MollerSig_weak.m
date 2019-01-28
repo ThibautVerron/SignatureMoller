@@ -1,6 +1,6 @@
 // Created: Wed Dec 13 17:47:42 2017
-// Last modified: Tue Oct  9 15:35:17 2018
-// Hash: 6de1ab6d18ab8e847aa9ba5ac0ac5f9a
+// Last modified: Mon Jan 28 16:13:12 2019
+// Hash: 1ae0b3957a865ace2f3fd7be58a735d1
 
 load "Signatures.m";
 
@@ -273,7 +273,7 @@ function OneSingularReducible(g,SigG,sigs,LMs,ss)
     return test;
 end function;
 
-function Moller_GB (F,funs :
+function MollerSig_weak (F,funs :
                     Signature := true,
                     F5_Criterion := true,
                     Sing_Criterion := true)

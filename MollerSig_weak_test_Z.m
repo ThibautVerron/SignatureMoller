@@ -1,6 +1,6 @@
 // Created: Thu Dec 14 11:25:07 2017
-// Last modified: Tue Oct  9 15:22:41 2018
-// Hash: 7f91f4d9d8eec30c749afa05ceb88f4e
+// Last modified: Mon Jan 28 16:16:20 2019
+// Hash: 7d2d112d0b8f42456b6f3a37d7d1ab19
 
 load "MollerSig.m";
 
@@ -19,22 +19,22 @@ if ring then
 
     funs := <Euclid_SatIdeal, Euclid_CosetRep, Euclid_LinDecomp>;
 
-    time G1,S1 := Moller_GB(F,funs
+    time G1,S1 := MollerSig_weak(F,funs
                          : Signature := false,
                            F5_Criterion := false,
                            Sing_Criterion := false);
     printf "--------------------\n";
-    time G2,S2 := Moller_GB(F,funs
+    time G2,S2 := MollerSig_weak(F,funs
                          : Signature := true,
                            F5_Criterion := false,
                            Sing_Criterion := false);
     printf "--------------------\n";
-    time G3,S3 := Moller_GB(F,funs
+    time G3,S3 := MollerSig_weak(F,funs
                          : Signature := true,
                            F5_Criterion := true,
                            Sing_Criterion := false); 
     printf "--------------------\n";
-    time G4,S4 := Moller_GB(F,funs
+    time G4,S4 := MollerSig_weak(F,funs
                          : Signature := true,
                            F5_Criterion := true,
                            Sing_Criterion := true); 
@@ -67,22 +67,22 @@ else
 
     funs := <Field_SatIdeal, Field_CosetRep, Field_LinDecomp>;
 
-    time G1 := Moller_GB(F,funs
+    time G1 := MollerSig_weak(F,funs
                          : Signature := false,
                            F5_Criterion := false,
                            Sing_Criterion := false);
     printf "--------------------\n";
-    time G2,S2 := Moller_GB(F,funs
+    time G2,S2 := MollerSig_weak(F,funs
                             : Signature := true,
                               F5_Criterion := false,
                               Sing_Criterion := false);
     printf "--------------------\n";
-    time G3,S3 := Moller_GB(F,funs
+    time G3,S3 := MollerSig_weak(F,funs
                             : Signature := true,
                               F5_Criterion := true,
                               Sing_Criterion := false); 
     printf "--------------------\n";
-    time G4,S4 := Moller_GB(F,funs
+    time G4,S4 := MollerSig_weak(F,funs
                             : Signature := true,
                               F5_Criterion := true,
                               Sing_Criterion := true); 

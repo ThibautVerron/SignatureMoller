@@ -1,8 +1,8 @@
 // Created: Thu Dec 14 11:25:07 2017
-// Last modified: Mon Feb  5 14:51:13 2018
-// Hash: 74020a18536ce03a8d22a7de84410558
+// Last modified: Mon Jan 28 16:17:29 2019
+// Hash: 79d3137c94b18ffe7dd17d217eb5c8b6
 
-load "MollerSig.m";
+load "MollerSig_weak.m";
 
 char := 23;
 R<A,B> := PolynomialRing(GF(char),2,"grevlex");
@@ -13,24 +13,24 @@ F := [3*(A+B)*X^2 + (2*A+B)*Y*H,
       X-A*Y+H
      ];
 
-funs := <Pol_SatGen, Pol_CosetRep, Pol_BasisCoords>;
+funs := <Pol_SatIdeal, Pol_CosetRep, Pol_LinDecomp>;
 
-time G1 := Moller_GB(F,funs
+time G1 := MollerSig_weak(F,funs
                      : Signature := false,
                        F5_Criterion := false,
                        Sing_Criterion := false);
 printf "--------------------\n";
-time G2 := Moller_GB(F,funs
+time G2 := MollerSig_weak(F,funs
                      : Signature := true,
                        F5_Criterion := false,
                        Sing_Criterion := false);
 printf "--------------------\n";
-time G3 := Moller_GB(F,funs
+time G3 := MollerSig_weak(F,funs
                      : Signature := true,
                        F5_Criterion := true,
                        Sing_Criterion := false);
 printf "--------------------\n";
-time G4 := Moller_GB(F,funs
+time G4 := MollerSig_weak(F,funs
                      : Signature := true,
                        F5_Criterion := true,
                        Sing_Criterion := true);
