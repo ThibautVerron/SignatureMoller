@@ -1,10 +1,11 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Mon Jan 28 14:20:29 2019
-// Hash: afe2ecbd67f3ca463d8a5b4d226a01d3
+// Last modified: Mon Jan 28 16:08:31 2019
+// Hash: 5b5bd6e4558752cc84991f2b9ef77777
+
+Attach("general.m");
 
 load "Signatures.m";
 
-Attach("general.m");
 
 function SPol_Sig(f1,f2,t,s1,s2)
     /* Return a signature similar to the signature of a S-polynomial.
@@ -561,7 +562,6 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     for i in [1..N-1] do
         if not Criterion_Coprime(f,G[i]) then
             cnt_coprime +:= 1;
-            cnt_GH_C1 +:= 1;
         elif GebauerMoller and not Criterion_Chain_back(T,G,sigs,i,N) then
             cnt_GM_all +:= 1;
         /* elif GebauerMoller and not Criterion_GH_C2(T,G,sigs,i,N) then */
@@ -607,7 +607,7 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     Append(~sigsSG,sf);
     for i in [1..#SG-1] do
         p,sp := GPol(f,SG[i],sf,sigsSG[i]);
-        if p ne 0 /* and (not Signature or not Sig_IsNull(sp)) */ then
+        if p ne 0 then
             Append(~SG,p);
             Append(~sigsSG,sp);
         end if;
