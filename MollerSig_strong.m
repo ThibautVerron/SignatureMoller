@@ -1,8 +1,10 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Sat Jan 26 11:36:22 2019
-// Hash: 801772a3d1d0e45909877bbb4b01dad9
+// Last modified: Mon Jan 28 14:20:29 2019
+// Hash: afe2ecbd67f3ca463d8a5b4d226a01d3
 
 load "Signatures.m";
+
+Attach("general.m");
 
 function SPol_Sig(f1,f2,t,s1,s2)
     /* Return a signature similar to the signature of a S-polynomial.
@@ -66,7 +68,7 @@ end function;
 
 function GPol(f1,f2,s1,s2)
     /*
-    Compute a G-polynomial and its sitgnature
+    Compute a G-polynomial and its G-signature
 
     INPUT:
     - f1, f2 two polynomials
@@ -77,10 +79,10 @@ function GPol(f1,f2,s1,s2)
     - s \simeq S_G(s1,s2)
 
     NOTE:
-    - s is sig(GPol(f1,f2)) if the combination is not a signature
-    drop, or S_G(f1,f2) if it is.  Using sig(GPol(f1,f2)) whenever
-    possible makes the 1-singular criterion more efficient (against
-    G_s).
+    - s is actually a true signature (S-labelling) if the combination
+      is not a signature drop.  Using sig(GPol(f1,f2)) whenever
+      possible makes the 1-singular criterion more efficient (against
+      G_s).
 
     TODO: if we can implement the singular criterion with similar sig-lead ratios, we probably won't need sig(GPol(f1,f2)) anymore
 
@@ -174,14 +176,8 @@ function StrongReduce(f,sf,G,sigs
         tf := LeadingTerm(f);
         for i := 1 to #G do
             g := G[i];
-            /* sg := sigs[i]; */
-
-            /* tg := LeadingTerm(g); */
             test,d := IsDivisibleBy(tf,LeadingTerm(g));
             if test then
-                /* md := LeadingMonomial(d); */
-                //cd := LeadingCoefficient(d);
-n                /* sig_red := Sig_Multiply(sigs[i],(-1)*cd,md); */
                 /* sig_res := Sig_Add(sf,sig_red); */
                 if ((not Signature)
                     or
@@ -192,12 +188,9 @@ n                /* sig_red := Sig_Multiply(sigs[i],(-1)*cd,md); */
                     /*  and not Sig_IsNull(sig_res)) */
                    )  then
 
-                    /* printf "%o ",i; */
                     f -:= d * g;
-                    /* sf := sig_res; */
                     done := false;
 
-                    /* break; */
                     if f eq 0 then
                         break; // Break for, so go back to the beginning of the while
                     else
@@ -208,6 +201,7 @@ n                /* sig_red := Sig_Multiply(sigs[i],(-1)*cd,md); */
         end for;
     end while;
 
+    // LC reductions, for the future?
     /* if LC_red and f ne 0 then */
     /*     f := LCReduce(f,sf,G,sigs : Signature := Signature); */
     /* end if; */
@@ -236,7 +230,6 @@ function TotalStrongReduce(f,sf,G,sigs
     
     res := 0;
     ff := f;
-    /* sff := sf; */
     while ff ne 0 do
         ff := StrongReduce(ff,sf,G,sigs : Signature := Signature);
         res +:= LeadingTerm(ff);
@@ -246,9 +239,6 @@ function TotalStrongReduce(f,sf,G,sigs
     return res;
 end function;
 
-/* function StrongReduce(f,G) */
-/*     return NormalForm(f,G); */
-/* end function; */
 
 function Criterion_Coprime(f,g)
     /* Implement the coprime criterion.
@@ -311,7 +301,7 @@ function IsEqualUpToUnit(a,b)
     return IsDivisibleBy(a,b) and IsUnit(a div b);
 end function;
 
-function Criterion_GebauerMoller_all(T,G,sigs,i,j,k)
+function Criterion_Chain(T,G,sigs,i,j,k)
     /* Implement the chain criterion with signatures
 
     INPUT:
@@ -334,12 +324,10 @@ function Criterion_GebauerMoller_all(T,G,sigs,i,j,k)
 
     test := IsDivisibleBy(T[j][i],LeadingTerm(G[k])) and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k);
     
-    //printf "S-polynomial eliminated with GM-criterion: "
-               
     return not test;
 end function;
     
-function Criterion_GebauerMoller_all_back(T,G,sigs,i,j)
+function Criterion_Chain_back(T,G,sigs,i,j)
     /* Implement the chain criterion with signatures, looking back for
     a k
 
@@ -355,7 +343,7 @@ function Criterion_GebauerMoller_all_back(T,G,sigs,i,j)
    */
     test := true;
     for k in [1..j-1] do
-        if not Criterion_GebauerMoller_all(T,G,sigs,i,j,k) then
+        if not Criterion_Chain(T,G,sigs,i,j,k) then
             test := false;
             break;
         end if;
@@ -369,23 +357,16 @@ function Criterion_GebauerMoller_B(T,G,sigs,i,j,k)
     /* Implements Gebauer-Möller's "B" criterion.
 
     NOTE:
-    - this function is not called at the moment, but it should be called whenever we use the algorithms without signatures.
+    - this function is not called at the moment, but it should be
+      called whenever we use the algorithms without signatures.
    */
        
     if i eq k or j eq k then
         return true;
     end if;
     test := true;
-    /* Sij := SPol_Sig(G[i],G[j],T[j][i],sigs[i],sigs[j]); */
-    /* Sjk := SPol_Sig(G[i],G[k],T[k][i],sigs[i],sigs[k]); */
-    /* Sik := SPol_Sig(G[j],G[k],T[k][j],sigs[j],sigs[k]); */
-    /* Tijk := Lcm(T[j][i],LeadingTerm(G[k])); */
     test := j ge k
-                     /* or Sig_Lt(Sij, Sig_Multiply(Sik, 1, Tijk div T[k][i])) */
-                     /* or Sig_Lt(Sij, Sig_Multiply(Sjk, 1, Tijk div T[k][j])) */
             or (not(IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
-                                /* and LeadingMonomial(T[k][i]) ne LeadingMonomial(T[j][i]) */
-                                /* and LeadingMonomial(T[k][j]) ne LeadingMonomial(T[j][i]) */
                    and (T[k][i]) ne (T[j][i])
                    and (T[k][j]) ne (T[j][i])
                   ))
@@ -398,14 +379,11 @@ function Criterion_GebauerMoller_M(T,G,sigs,i,k)
     /* Implements Gebauer-Möller's "M" criterion.
 
     NOTE:
-    - this function is not called at the moment, but it should be called whenever we use the algorithms without signatures.
+    - this function is not called at the moment, but it should be
+      called whenever we use the algorithms without signatures.
    */
 
     test := true;
-
-    /* if i gt j then */
-    /*     i,j := Explode(<j,i>); */
-    /* end if; */
 
     for j in [1..k-1] do
         if i eq j then // Can't satisfy the criterion in that case anyway
@@ -415,21 +393,9 @@ function Criterion_GebauerMoller_M(T,G,sigs,i,k)
         else
             Tji := T[j][i];
         end if;
-        /* if i lt j then */
-        /*     Sij := SPol_Sig(G[i],G[j],T[j][i],sigs[i],sigs[j]); */
-        /* else */
-        /*     Sij := SPol_Sig(G[i],G[j],T[i][j],sigs[i],sigs[j]); */
-        /* end if;            */
-        /* Sjk := SPol_Sig(G[i],G[k],T[k][i],sigs[i],sigs[k]); */
-        /* Sik := SPol_Sig(G[j],G[k],T[k][j],sigs[j],sigs[k]); */
-        /* Tijk := Lcm(T[k][i],LeadingTerm(G[j])); */
-
-        if /* Sig_Geq(Sij, Sig_Multiply(Sik, 1, Tijk div T[k][i])) */
-            /* and Sig_Geq(Sij, Sig_Multiply(Sjk, 1, Tijk div T[k][j])) */
-            IsDivisibleBy(Tji,T[k][j])
-                         /* and LeadingMonomial(T[k][i]) ne LeadingMonomial(T[k][j]) */
-            and (T[k][j]) ne (Tji)
-            and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
+        if IsDivisibleBy(Tji,T[k][j])
+           and (T[k][j]) ne (Tji)
+           and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
             then
             test := false;
             break;
@@ -447,14 +413,7 @@ function Criterion_GebauerMoller_F(T,G,sigs,i,k)
     
     test := true;
     for j in [1..i-1] do
-        /* Sij := SPol_Sig(G[i],G[j],T[i][j],sigs[i],sigs[j]); */
-        /* Sjk := SPol_Sig(G[i],G[k],T[k][i],sigs[i],sigs[k]); */
-        /* Sik := SPol_Sig(G[j],G[k],T[k][j],sigs[j],sigs[k]); */
-        /* Tijk := Lcm(T[k][i],LeadingTerm(G[i])); */
-
         if T[i][j] eq T[k][i]
-           /* and Sig_Geq(Sij, Sig_Multiply(Sik, 1, Tijk div T[k][i])) */
-                       /* and Sig_Geq(Sij, Sig_Multiply(Sjk, 1, Tijk div T[k][j]))      */
            and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
             then
             test := false;
@@ -463,8 +422,6 @@ function Criterion_GebauerMoller_F(T,G,sigs,i,k)
     end for;
     return test;
 end function;
-
-/* function Criterion_GH_C1 */
 
 function Criterion_1SingularReducible(f,sf,G,sigs)
     /* Test whether f is 1-singular reducible modulo G
@@ -498,28 +455,6 @@ function Criterion_1SingularReducible(f,sf,G,sigs)
             test := true;
             break;
         end if;
-
-        /* test2, ttg := IsDivisibleBy(tf,LeadingTerm(g)); */
-        /* if test2 then */
-        /*     ccg := LeadingCoefficient(ttg); */
-        /*     mmg := LeadingMonomial(ttg); */
-        /*     if Sig_Eq(Sig_Multiply(sg,ccg,mmg),sf) then */
-        /*         test := true; */
-        /*         break; */
-        /*     end if; */
-        /* end if; */
-                
-        /* if IsDivisibleBy(tf,LeadingTerm(g)) then */
-        /*     mmg := mf div LeadingMonomial(g); */
-        /*     ccg := cf div LeadingCoefficient(g); */
-        /*     s := Sig_Multiply(sg,ccg,mmg); */
-        /*     if Sig_Simeq(sf,s) then */
-        /*         // QUESTION: Why does it work better with simeq? */
-        /*     /\* if sg`i eq sf`i and sg`mu*mmg eq sf`mu and IsDivisibleBy(sf`k,sg`k) then *\/ */
-        /*         test := true; */
-        /*         break; */
-        /*     end if; */
-        /* end if; */
     end for;
     return test;
 end function;
@@ -548,10 +483,6 @@ function Criterion_F5(f,sf,G,sigs)
     mon := sf`k * sf`mu;
     mon_red := StrongReduce(mon,sf,LPols,sigs : Signature:=false, LC_red := false);
     res := mon_red ne 0;
-    /* printf "Criterion_F5: testing %o\n",Sig_ToString(sf); */
-    /* if sf`i eq 3 and sf`k eq -1 and sf`mu eq (Parent(f).1)^2 then */
-    /*     Error("Time to check"); */
-    /* end if; */
     return res;
 end function;
 
@@ -579,7 +510,6 @@ end function;
 
 procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
                            ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
-                           ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
                            ~cnt_pairs,~cnt_Spairs
                            : Signature := false, GebauerMoller := false)
     /* Implement the procedure "Update": update the two Gröbner bases, the list of pairs and the caches
@@ -603,7 +533,6 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
       Gebauer-Möller's M criterion
     - cnt_GM_all an integer counting pairs eliminated with the chain
       criterion with signatures
-    - cnt_GH_C1,cnt_GH_C2,cnt_GH_C3 integers which are ignored
     - cnt_pairs an integer counting how many pairs are considered
     - cnt_Spairs an integer counting how many pairs are added to P
 
@@ -633,7 +562,7 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
         if not Criterion_Coprime(f,G[i]) then
             cnt_coprime +:= 1;
             cnt_GH_C1 +:= 1;
-        elif GebauerMoller and not Criterion_GebauerMoller_all_back(T,G,sigs,i,N) then
+        elif GebauerMoller and not Criterion_Chain_back(T,G,sigs,i,N) then
             cnt_GM_all +:= 1;
         /* elif GebauerMoller and not Criterion_GH_C2(T,G,sigs,i,N) then */
         /*     cnt_GH_C2 +:= 1; */
@@ -661,7 +590,7 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
         for k in [1..#P] do
             pp := P[k];
             ii,jj := Explode(pp[3]);
-            if not Criterion_GebauerMoller_all(T,G,sigs,ii,jj,N) then
+            if not Criterion_Chain(T,G,sigs,ii,jj,N) then
             /* if not Criterion_GebauerMoller_B(T,G,sigs,ii,jj,N) then */
                 /* printf "Removed pair due to Gebauer-Moller B criterion\n"; */
                 cnt_GM_all +:= 1;
@@ -685,12 +614,66 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     end for;
 end procedure;
 
-function BuchbergerSig(F:
+function MollerSig(F:
                     Signature := true,
                     F5_Criterion := true,
                     Sing_Criterion := true,
-                    GebauerMoller := true)
+                    GebauerMoller := true,
+                    InterReduce := true)
+    /* Uses Möller's strong GB algorithm to compute a Gröbner basis.
 
+    INPUT:
+    - F : polynomial system over R
+    - Signature (default: true): whether to use signatures
+    - F5_Criterion (default: true): whether to use the F5 criterion
+    - Sing_Criterion (default: true): whether to use the Singular
+      criterion
+    - GebauerMoller (default: true): whether to use Buchberger's chain
+      criterion (through Gebauer-Moller's criteria, if no signatures)
+    - InterReduce (default: true): whether to inter-reduce the Gröbner
+      basis whenever we process a new polynomial (see below)
+
+    OUTPUT:
+    - G : weak Gröbner basis of Ideal(F)
+    - SG : strong Gröbner basis of Ideal(F)
+    - sigs : sigs[i] is the signature (S-label) of G[i] (unless
+      InterReduce is true, then see below)
+    - sigsSG : sigsSG[i] is the G-signature of SG[i]
+    - T: T[i][j], if i < j is an admissible pair, is
+      lcm(LT(G[i]),LT(G[j])) if InterReduce is false (otherwise, see
+      below)
+
+    ASSUMPTION:
+    - the coefficient ring of R is a PID
+
+    NOTES:
+    - If Signature is false, sigs and sigsSG are obviously meaningless
+    
+    - If InterReduce is true, whenever the algorithm adds F[i] to the
+      Gröbner basis, it knows that all elements which will be computed
+      later have signature at least e_i, and all elements computed
+      before have signature at most m*e_(i-1) for m large enough. So
+      it can inter-reduce the Gröbner basis, disregarding signature
+      restrictions, and give every polynomial in the result label
+      m*e_(i-1) (or even e_1 if we don't want the output to be a
+      S-GB).
+
+      This leads to a huge speed-up in the computations. However, the
+      result is that sigs is only a S-labelling from signature e_i on,
+      and only a G-labelling before that. And T[i][j], if i and j are
+      less than the index of F[i], no longer matches the indices in
+      G. This is harmless in the computations, but the user who cares
+      about this part of the output should set InterReduce to false.
+
+    - GebauerMoller's criteria, without signatures, are currently not
+      implemented.
+
+    - The algorithm obeys the verbosity flag "MollerSig", with values
+      from 0 to 3.    
+    
+   */
+
+    
     if not Signature then
         F5_Criterion := false;
         Sing_Criterion := false;
@@ -702,9 +685,6 @@ function BuchbergerSig(F:
     cnt_GM_M := 0;
     cnt_GM_F := 0;
     cnt_GM_all := 0;
-    cnt_GH_C1 := 0;
-    cnt_GH_C2 := 0;
-    cnt_GH_C3 := 0;
     cnt_1sing_red := 0;
     cnt_sing := 0;
     cnt_syz := 0;
@@ -720,9 +700,9 @@ function BuchbergerSig(F:
     m := #F;
     A := Parent(F[1]);
     for i in [1..m] do
-        printf "############ i=%o ##############\n",i;
+        vprintf MollerSig,1: "############ i=%o ############\n",i;
 
-        if i gt 1 then
+        if i gt 1 and InterReduce then
             SG := ReduceGroebnerBasis(SG);
             sigsSG := [Sig_Create(1,1,i-1) : g in SG];
             G := SG;
@@ -730,7 +710,7 @@ function BuchbergerSig(F:
             T := [[] : g in SG];
         end if;
         
-        f := F[i]; // We get a wrong result if we reduce first???
+        f := F[i]; 
         sf := Sig_Create(1,1,i);
         f := TotalStrongReduce(f,sf,SG,sigsSG
                                : Signature := Signature); 
@@ -739,24 +719,23 @@ function BuchbergerSig(F:
         end if;
         UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
                          ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
-                         ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
                          ~cnt_pairs,~cnt_Spairs
                          : Signature := Signature,
                            GebauerMoller := GebauerMoller);
         while #P gt 0 do
-            printf "#P=%o #G=%o\n", #P, #G;
+            vprintf MollerSig,2: "#P=%o #G=%o\n", #P, #G;
             next := 1; 
             pp := P[next]; Remove(~P,next);
             p := pp[1]; sp := pp[2];
             if Signature then
                 if (F5_Criterion
                     and not Criterion_F5(p,sp,SG,sigsSG)) then
-                    printf "Polynomial excluded by F5 criterion\n"/* : sig=%o\n", Sig_ToString(sp) *//* , LeadingTerm(p) */;
+                    vprintf MollerSig,3: "Polynomial excluded by F5 criterion\n"/* : sig=%o\n", Sig_ToString(sp) *//* , LeadingTerm(p) */;
                     cnt_F5 +:= 1;
                     continue;
                 elif (Sing_Criterion
                       and not Criterion_Singular(p,sp,G,sigs)) then
-                    printf "Polynomial excluded by Singular criterion\n";
+                    vprintf MollerSig,3: "Polynomial excluded by Singular criterion\n";
                     cnt_sing +:= 1;
                     continue;
                 end if;
@@ -765,22 +744,19 @@ function BuchbergerSig(F:
             r := StrongReduce(p,sp,SG,sigsSG
                               : Signature := Signature, LC_red := false);
             if r eq 0 then
-                printf "Reduction to zero: sig=%o\n", Sig_ToString(sp);
+                vprintf MollerSig,3 : "Reduction to zero: sig=%o\n", Sig_ToString(sp);
                 cnt_syz +:= 1;
             elif Signature
                  and Criterion_1SingularReducible(r,sp,SG,sigsSG) then
-                printf "Basis element excluded because 1-singular reducible\n";
+                vprintf MollerSig,3 : "Basis element excluded because 1-singular reducible\n";
                 cnt_1sing_red +:= 1;
             else
                 r := TotalStrongReduce(r,sp,SG,sigsSG : Signature := Signature);
-                printf "New basis element: sig=%o, LT=%o\n",
+                vprintf MollerSig,3 : "New basis element: sig=%o, LT=%o\n",
                        Sig_ToString(sp), LeadingTerm(r);//, pp[3];
-                /* if LeadingTerm(r) eq Y^2*Z then */
-                /*     error("Found it"); */
                 /* end if; */
                 UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,r,sp,
                                  ~cnt_coprime,~cnt_GM_B,~cnt_GM_M,~cnt_GM_F,~cnt_GM_all,
-                                 ~cnt_GH_C1,~cnt_GH_C2,~cnt_GH_C3,
                                  ~cnt_pairs,~cnt_Spairs
                                  : Signature := Signature,
                                    GebauerMoller := GebauerMoller);
@@ -788,20 +764,20 @@ function BuchbergerSig(F:
         end while;
     end for;
 
-    printf "Total # of S-polynomials: %o\n", cnt_Spairs;
-    printf "Total # of considered pairs: %o\n", cnt_pairs;
-    printf "Total # of reductions to 0: %o\n", cnt_syz;
-    printf "Total # of skipped pairs with coprime criterion: %o\n", cnt_coprime;
-    printf "Total # of skipped pairs with Gebauer-Moller criteria: %o\n", cnt_GM_all;
-    /* printf "Total # of skipped pairs with Gebauer-Moller \"B\" criterion: %o\n", cnt_GM_B; */
-    /* printf "Total # of skipped pairs with Gebauer-Moller \"M\" criterion: %o\n", cnt_GM_M; */
-    /* printf "Total # of skipped pairs with Gebauer-Moller \"F\" criterion: %o\n", cnt_GM_F; */
-    /* printf "Total # of skipped pairs with Gerdt-Hashemi \"C1\" criterion: %o\n", cnt_GH_C1; */
-    /* printf "Total # of skipped pairs with Gerdt-Hashemi \"C2\" criterion: %o\n", cnt_GH_C2; */
-    /* printf "Total # of skipped pairs with Gerdt-Hashemi \"C3\" criterion: %o\n", cnt_GH_C3; */
-    printf "Total # of skipped pairs with F5 criterion: %o\n", cnt_F5;
-    printf "Total # of skipped pairs with sing criterion: %o\n", cnt_sing;
-    printf "Total # of skipped 1-singular-reducible pols: %o\n", cnt_1sing_red;
+    vprintf MollerSig,1 : "Total # of S-polynomials: %o\n", cnt_Spairs;
+    vprintf MollerSig,1 : "Total # of considered pairs: %o\n", cnt_pairs;
+    vprintf MollerSig,1 : "Total # of reductions to 0: %o\n", cnt_syz;
+    vprintf MollerSig,1 : "Total # of skipped pairs with coprime criterion: %o\n", cnt_coprime;
+    if Signature then
+        vprintf MollerSig,1 : "Total # of skipped pairs with chain criterion: %o\n", cnt_GM_all;
+    else
+        vprintf MollerSig,1 : "Total # of skipped pairs with Gebauer-Moller \"B\" criterion: %o\n", cnt_GM_B;
+        vprintf MollerSig,1 : "Total # of skipped pairs with Gebauer-Moller \"M\" criterion: %o\n", cnt_GM_M;
+        vprintf MollerSig,1 : "Total # of skipped pairs with Gebauer-Moller \"F\" criterion: %o\n", cnt_GM_F;
+    end if;
+    vprintf MollerSig,1 : "Total # of skipped pairs with F5 criterion: %o\n", cnt_F5;
+    vprintf MollerSig,1 : "Total # of skipped pairs with sing criterion: %o\n", cnt_sing;
+    vprintf MollerSig,1 : "Total # of skipped 1-singular-reducible pols: %o\n", cnt_1sing_red;
     
     return G,SG,sigs,sigsSG,T;    
 end function;
