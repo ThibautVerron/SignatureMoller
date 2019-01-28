@@ -1,0 +1,13 @@
+#+TITLE: Möller's algorithms with signatures
+
+* Index of the repository
+
+- =Signatures.m= : functions related to signatures
+- =MollerSig_weak.m= : signature-based version of Möller's weak GB algorithm
+- =MollerSig_strong.m= : signature-based version of Möller's strong GB algorithm (for Principal Ideal Domains)
+
+* References
+
+Description of the adaptation of Möller's weak GB algorithm: [[https://arxiv.org/abs/1802.01388]]
+
+Description of the adaptation of Möller's strong GB algorithm: (tba)
