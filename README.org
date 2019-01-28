@@ -8,6 +8,6 @@
 
 * References
 
-Description of the adaptation of Möller's weak GB algorithm: [[https://arxiv.org/abs/1802.01388]]
+Signature version of Möller's weak GB algorithm: [[https://arxiv.org/abs/1802.01388]]
 
-Description of the adaptation of Möller's strong GB algorithm: (tba)
+Signature version of Möller's strong GB algorithm: (tba)

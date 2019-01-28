@@ -1,6 +1,6 @@
 // Created: Tue Oct  9 14:20:56 2018
-// Last modified: Mon Jan 28 16:15:29 2019
-// Hash: f6e827bc2065579db7b51827b95dffe6
+// Last modified: Mon Jan 28 17:00:18 2019
+// Hash: 79cf174933ac5230c0105e0185d12628
 
 load "MollerSig_weak.m";
 load "MollerSig_strong.m";
@@ -35,14 +35,14 @@ funs := <Euclid_SatIdeal, Euclid_CosetRep, Euclid_LinDecomp>;
 
 load "def_Katsura.m";
 
-time G,S := MollerSig_weak(K,funs:
-                      Signature := sig,
-                      F5_Criterion := F5,
-                      Sing_Criterion := sing);
+/* time G,S := MollerSig_weak(K,funs: */
+/*                       Signature := sig, */
+/*                       F5_Criterion := F5, */
+/*                       Sing_Criterion := sing); */
 
-/* time G,S := MollerSig(K: */
-/*                           Signature := false, */
-/*                           GebauerMoller := true); */
+time G,S := MollerSig(K:
+                          Signature := false,
+                          GebauerMoller := true);
 
 
 /*

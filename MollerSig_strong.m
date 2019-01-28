@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Mon Jan 28 16:08:31 2019
-// Hash: 5b5bd6e4558752cc84991f2b9ef77777
+// Last modified: Mon Jan 28 17:20:42 2019
+// Hash: afe4c574a7a9f01a21270e7243e531a8
 
 Attach("general.m");
 
@@ -85,7 +85,7 @@ function GPol(f1,f2,s1,s2)
       possible makes the 1-singular criterion more efficient (against
       G_s).
 
-    TODO: if we can implement the singular criterion with similar sig-lead ratios, we probably won't need sig(GPol(f1,f2)) anymore
+    sig(GPol(f1,f2)) anymore
 
    */
     m1 := LeadingMonomial(f1);
@@ -271,6 +271,9 @@ function Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
     OUTPUT:
     - true if and only S(i,j) >= T(i,j)/T(k) S(k)
 
+    NOTE:
+    - this function is not called
+
    */
     
     if i eq k or j eq k or i eq j then
@@ -355,73 +358,34 @@ end function;
 
 
 function Criterion_GebauerMoller_B(T,G,sigs,i,j,k)
-    /* Implements Gebauer-Möller's "B" criterion.
+    /* Implements Gebauer-Möller's "B" criterion, without signature.
 
-    NOTE:
-    - this function is not called at the moment, but it should be
-      called whenever we use the algorithms without signatures.
+    (True iff the polynomial should be kept)
    */
-       
-    if i eq k or j eq k then
-        return true;
-    end if;
-    test := true;
-    test := j ge k
-            or (not(IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
-                   and (T[k][i]) ne (T[j][i])
-                   and (T[k][j]) ne (T[j][i])
-                  ))
-            or (not Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k))
-    ;
-    return test;
+
+    test := i lt j and j lt k
+            and IsDivisibleBy(T[j][i],LeadingTerm(G[k]))
+            and T[k][j] ne T[j][i]
+            and T[j][i] ne T[k][j];
+    return not test;
 end function;
     
 function Criterion_GebauerMoller_M(T,G,sigs,i,k)
-    /* Implements Gebauer-Möller's "M" criterion.
-
-    NOTE:
-    - this function is not called at the moment, but it should be
-      called whenever we use the algorithms without signatures.
+    /* Implements Gebauer-Möller's "M" criterion, without signature.
    */
-
-    test := true;
-
-    for j in [1..k-1] do
-        if i eq j then // Can't satisfy the criterion in that case anyway
-            continue;
-        elif i gt j then
-            Tji := T[i][j];
-        else
-            Tji := T[j][i];
-        end if;
-        if IsDivisibleBy(Tji,T[k][j])
-           and (T[k][j]) ne (Tji)
-           and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
-            then
-            test := false;
-            break;
-        end if;
-    end for;
-    return test;
+    test := i lt k
+            and exists{j : j in [1..k-1] |
+                       IsDivisibleBy(T[k][i],T[k][j])
+                       and T[k][j] ne T[k][i]};
+    return not test;
 end function;
 
 function Criterion_GebauerMoller_F(T,G,sigs,i,k)
-    /* Implements Gebauer-Möller's "F" criterion.
-
-    NOTE:
-    - this function is not called at the moment, but it should be called whenever we use the algorithms without signatures.
-   */
-    
-    test := true;
-    for j in [1..i-1] do
-        if T[i][j] eq T[k][i]
-           and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
-            then
-            test := false;
-            break;
-        end if;
-    end for;
-    return test;
+    /* Implements Gebauer-Möller's "F" criterion, without signature.
+     */
+    test := i lt k
+            and exists{j : j in [1..i-1] | T[k][j] eq T[k][i]};
+    return not test;
 end function;
 
 function Criterion_1SingularReducible(f,sf,G,sigs)
@@ -556,27 +520,33 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     for i in [1..N-1] do
         Append(~T[N],Lcm(LeadingTerm(G[i]),t));
     end for;
-    cnt_pairs +:= N;
+    cnt_pairs +:= N-1;
     
     // Updating the list of critical pairs
     for i in [1..N-1] do
         if not Criterion_Coprime(f,G[i]) then
             cnt_coprime +:= 1;
-        elif GebauerMoller and not Criterion_Chain_back(T,G,sigs,i,N) then
-            cnt_GM_all +:= 1;
-        /* elif GebauerMoller and not Criterion_GH_C2(T,G,sigs,i,N) then */
-        /*     cnt_GH_C2 +:= 1; */
-        /* elif GebauerMoller and not Criterion_GH_C3(T,G,sigs,i,N) then */
-            /*     cnt_GH_C3 +:= 1; */
-        /* elif GebauerMoller and not Criterion_GebauerMoller_M(T,G,sigs,i,N) then */
-        /*     cnt_GM_M +:= 1; */
-        /* elif GebauerMoller and not Criterion_GebauerMoller_F(T,G,sigs,i,N) then */
-        /*     cnt_GM_F +:= 1; */
+        elif Signature then
+            if GebauerMoller and not Criterion_Chain_back(T,G,sigs,i,N) then
+                cnt_GM_all +:= 1;
+            else
+                cnt_Spairs +:= 1;
+                p,sp := SPol(f,G[i],T[N][i],sf,sigs[i]);
+                if p ne 0 and not Sig_IsNull(sp) then
+                    Append(~P,<p,sp,<i,N>>);
+                end if;
+            end if;
         else
-            cnt_Spairs +:= 1;
-            p,sp := SPol(f,G[i],T[N][i],sf,sigs[i]);
-            if p ne 0 and (not Signature or not Sig_IsNull(sp)) then
-                Append(~P,<p,sp,<i,N>>);
+            if GebauerMoller and not Criterion_GebauerMoller_M(T,G,sigs,i,N) then
+                cnt_GM_M +:= 1;
+            elif GebauerMoller and not Criterion_GebauerMoller_F(T,G,sigs,i,N) then
+                cnt_GM_F +:= 1;
+            else
+                cnt_Spairs +:= 1;
+                p,sp := SPol(f,G[i],T[N][i],sf,sigs[i]);
+                if p ne 0 then
+                    Append(~P,<p,sp,<i,N>>);
+                end if;
             end if;
         end if;
     end for;
@@ -590,11 +560,17 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
         for k in [1..#P] do
             pp := P[k];
             ii,jj := Explode(pp[3]);
-            if not Criterion_Chain(T,G,sigs,ii,jj,N) then
-            /* if not Criterion_GebauerMoller_B(T,G,sigs,ii,jj,N) then */
-                /* printf "Removed pair due to Gebauer-Moller B criterion\n"; */
-                cnt_GM_all +:= 1;
-                Append(~toRemove,k);
+            if Signature then
+                if not Criterion_Chain(T,G,sigs,ii,jj,N) then
+                    cnt_GM_all +:= 1;
+                    Append(~toRemove,k);
+                end if;
+            else
+                if not Criterion_GebauerMoller_B(T,G,sigs,ii,jj,N) then
+                    cnt_GM_B +:= 1;
+                    Append(~toRemove,k);
+                    cnt_Spairs -:= 1;
+                end if;
             end if;
         end for;
         for k in Reverse(toRemove) do
@@ -629,7 +605,7 @@ function MollerSig(F:
     - Sing_Criterion (default: true): whether to use the Singular
       criterion
     - GebauerMoller (default: true): whether to use Buchberger's chain
-      criterion (through Gebauer-Moller's criteria, if no signatures)
+      criterion (through Gebauer-Möller's criteria, if no signatures)
     - InterReduce (default: true): whether to inter-reduce the Gröbner
       basis whenever we process a new polynomial (see below)
 
@@ -664,9 +640,6 @@ function MollerSig(F:
       less than the index of F[i], no longer matches the indices in
       G. This is harmless in the computations, but the user who cares
       about this part of the output should set InterReduce to false.
-
-    - GebauerMoller's criteria, without signatures, are currently not
-      implemented.
 
     - The algorithm obeys the verbosity flag "MollerSig", with values
       from 0 to 3.    
