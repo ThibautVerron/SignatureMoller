@@ -1,6 +1,6 @@
 // Created: Tue May  8 16:03:43 2018
-// Last modified: Tue Jan 22 11:50:12 2019
-// Hash: ae55b8fc35c8328ff1727094efc35863
+// Last modified: Mon Jan 28 16:10:50 2019
+// Hash: 57e6905efd2ee6e5ea220436b511d723
 
 Sig := recformat<k,mu,i>;
 
@@ -41,9 +41,14 @@ function Sig_Leq(s1,s2)
 end function;
 
 function Sig_Geq(s1,s2)
+    /* True iff s1 \succ s2 or s1 \simeq s2 */
     return not Sig_Lt(s1,s2);
 end function;
 
+function Sig_Gt(s1,s2)
+    /* True iff s1 \succ s2 */
+    return not Sig_Leq(s1,s2);
+end function;
 
 function Sig_Multiply(aa,coef,mon)
     /* Multiply the signature aa with coef*mon */
@@ -51,6 +56,7 @@ function Sig_Multiply(aa,coef,mon)
 end function;
 
 function Sig_Max(aa,bb)
+    /* Return the max of two signature */
     if Sig_Lt(aa,bb) then
         return bb;
     else
@@ -59,6 +65,8 @@ function Sig_Max(aa,bb)
 end function;
 
 function Sig_Add(aa,bb)
+    /* Adds two signatures. Returns Sig_Null in case of signature drop */
+    
     if Sig_Simeq(aa,bb) then
         return Sig_Null;
         k := aa`k + bb`k;
@@ -85,7 +93,8 @@ function Sig_Compare(s1,s2)
 end function;
 
 function Sig_Compare_Full(s1,s2)
-    /* Comparison function, suitable for Sort */
+    /* Comparison function taking into account the coefficient,
+    suitable for Sort */
     if Sig_Lt(s1,s2) then
         return -1;
     elif Sig_Simeq(s1,s2) then
