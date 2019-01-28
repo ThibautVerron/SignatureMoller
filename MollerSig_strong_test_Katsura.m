@@ -1,9 +1,8 @@
 // Created: Tue Oct  9 14:20:56 2018
-// Last modified: Thu Jan 24 16:45:35 2019
-// Hash: 922d468b6a8a954c5d42b1bd77c1394c
+// Last modified: Mon Jan 28 14:24:08 2019
+// Hash: 9138490b3df282899b03dcd80b903ba8
 
-load "MollerSig.m";
-load "BuchbergerSig.m";
+load "MollerSig_strong.m";
 
 if assigned n and Type(n) eq MonStgElt then
     n := eval n;
@@ -29,22 +28,17 @@ elif not assigned sing then
     sing := true;
 end if;
 
-funs := <Euclid_SatIdeal, Euclid_CosetRep, Euclid_LinDecomp>;
 
 
 
 load "def_Katsura.m";
 
-/* time G,S := Moller_GB(K,funs: */
-/*                       Signature := sig, */
-/*                       F5_Criterion := F5, */
-/*                       Sing_Criterion := sing); */
 
-time G,SG := BuchbergerSig(K:
-                          Signature := true,
-                          F5_Criterion := true,
-                          Sing_Criterion := true,
-                          GebauerMoller := true);
+time G,SG := MollerSig(K:
+                       Signature := true,
+                       F5_Criterion := true,
+                       Sing_Criterion := true,
+                       GebauerMoller := true);
 
 SSG := ReduceGroebnerBasis(SG);
 printf "Is the weak GB Gröbner? %o\n", IsGroebner(G);
@@ -89,11 +83,6 @@ Total # of skipped pairs with F5 criterion: 388
 Total # of skipped pairs with sing criterion: 9
 Total # of skipped 1-singular-reducible pols: 84
 Time: 16.910
-
-
-
-###############
-Katsura 5:
 
 
 
