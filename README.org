@@ -5,9 +5,15 @@
 - =Signatures.m= : functions related to signatures
 - =MollerSig_weak.m= : signature-based version of Möller's weak GB algorithm
 - =MollerSig_strong.m= : signature-based version of Möller's strong GB algorithm (for Principal Ideal Domains)
+- =MollerSig_weak_test_Z.m= : test of Möller's weak GB algorithm over Z
+- =MollerSig_weak_test_poly.m= : test of Möller's weak GB algorithm over K[Y_1..Y_k]
+- =MollerSig_weak_test_Katsura.m= : test of Möller's weak GB algorithm on Katsura-n systems (over Z)
+- =MollerSig_strong_test_generic.m= : test of Möller's weak GB algorithm on random system (over Z)
+- =MollerSig_strong_test_Katsura.m= : test of Möller's weak GB algorithm on Katsura-n systems (over Z)
+- =def_Katsura.m= : definition of Katsura-n systems
 
 * References
 
 Signature version of Möller's weak GB algorithm: [[https://arxiv.org/abs/1802.01388]]
 
-Signature version of Möller's strong GB algorithm: (tba)
+Signature version of Möller's strong GB algorithm: http://arxiv.org/abs/1901.09586
