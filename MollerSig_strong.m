@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Mon Jan 28 17:20:42 2019
-// Hash: afe4c574a7a9f01a21270e7243e531a8
+// Last modified: Wed Mar  6 11:49:32 2019
+// Hash: 3ef3a23b147270a205604a50dfacab4c
 
 Attach("general.m");
 
@@ -47,23 +47,27 @@ function SPol(f1,f2,t,s1,s2)
       otherwise
     
    */
+    if t eq 0 then
+        t := Lcm(LeadingTerm(f1),LeadingTerm(f2));
+    end if;
     t1 := t div LeadingTerm(f1);
     t2 := t div LeadingTerm(f2);
     mm1 := LeadingMonomial(t1);
     cc1 := LeadingCoefficient(t1);
     mm2 := LeadingMonomial(t2);
     cc2 := LeadingCoefficient(t2);
+    /* print t; */
     f := cc1*mm1*f1 - cc2*mm2*f2;
     sf1 := Sig_Multiply(s1,cc1,mm1);
     sf2 := Sig_Multiply(s2,cc2,mm2);
-    // This excludes all singular S-polynomials
-    /* if not Sig_Simeq(sf1,sf2) then */
-    /*     sf := Sig_Max(sf1,sf2); */
-    /* else */
-    /*     sf := Sig_Null; */
-    /* end if; */
-    msf2 := Sig_Multiply(sf2,-1,1);
-    sf := Sig_Add(sf1,msf2); // Null iff strictly singular
+    // This excludes all singular S-polynomials 
+    if Sig_IsNull(sf1) or not Sig_Simeq(sf1,sf2) then
+        msf2 := Sig_Multiply(sf2,-1,1);
+        sf := Sig_Max(sf1,msf2);
+    else
+        sf := Sig_Null;
+    end if;
+    /* sf := Sig_Add(sf1,msf2); // Null iff strictly singular */
     return f,sf;
 end function;
 
@@ -94,7 +98,7 @@ function GPol(f1,f2,s1,s2)
     c2 := LeadingCoefficient(f2);
     m := Lcm(m1,m2);
     d,a1,a2 := ExtendedGreatestCommonDivisor(c1,c2);
-    if d ne c1 and d ne c2 then
+    if a1 ne 0 and a2 ne 0 then
         mm1 := m div m1;
         mm2 := m div m2;
         f := a1*mm1*f1 + a2*mm2*f2;
@@ -108,6 +112,10 @@ function GPol(f1,f2,s1,s2)
         f := Parent(f1)!0;
         sf := s1;
     end if;
+    if sf`k eq 0 then
+        error("Illegal signature computed.");
+    end if;
+
     return f,sf;
 end function;
 
@@ -133,7 +141,7 @@ function LCReduce(f,sf,G,sigs : Signature := false)
     - this function is not used at the moment
     
    */
-    
+
     mf := LeadingMonomial(f);
     N := #G;
     for i in [1..N] do
@@ -155,7 +163,7 @@ end function;
 
 function StrongReduce(f,sf,G,sigs
                       : Signature := false,
-                        LC_red := true)
+                        LC_red := false)
     /*
     Implement (regular) top-reduction.
 
@@ -203,16 +211,16 @@ function StrongReduce(f,sf,G,sigs
     end while;
 
     // LC reductions, for the future?
-    /* if LC_red and f ne 0 then */
-    /*     f := LCReduce(f,sf,G,sigs : Signature := Signature); */
-    /* end if; */
+    if LC_red and f ne 0 then
+        f := LCReduce(f,sf,G,sigs : Signature := Signature);
+    end if;
     
     /* printf "\n"; */
     return f;
 end function;
 
 function TotalStrongReduce(f,sf,G,sigs 
-                           : Signature := false)
+                           : Signature := false, LC_red := true)
     /*
     Implement (regular) reduction (including tail coefficients).
 
@@ -232,7 +240,7 @@ function TotalStrongReduce(f,sf,G,sigs
     res := 0;
     ff := f;
     while ff ne 0 do
-        ff := StrongReduce(ff,sf,G,sigs : Signature := Signature);
+        ff := StrongReduce(ff,sf,G,sigs : Signature := Signature, LC_red := LC_red);
         res +:= LeadingTerm(ff);
         ff -:= LeadingTerm(ff);
     end while;
@@ -269,25 +277,62 @@ function Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
     - T(k) divides T(i,j)
 
     OUTPUT:
-    - true if and only S(i,j) >= T(i,j)/T(k) S(k)
-
-    NOTE:
-    - this function is not called
-
+    - true if and only S(i,j) > T(i,j)/T(k) S(k) and (i,j) > (i,k) and (i,j) > (j,k)
    */
     
     if i eq k or j eq k or i eq j then
         return false;
     end if;
+
     if i gt j then
-        tmp := i; i := j; j := tmp;
+        jii := j; jij := i;
+    else
+        jii := i; jij := j;
     end if;
-    mji := LeadingMonomial(T[j][i]);
+
+    if j gt k then
+        kjj := k; kjk := j;
+    else
+        kjj := j; kjk := k;
+    end if;
+
+    if i gt k then
+        kii := k; kik := i;
+    else
+        kii := i; kik := k;
+    end if;
+    
+    mji := LeadingMonomial(T[jij][jii]);
+    mki := LeadingMonomial(T[kik][kii]);
+    mkj := LeadingMonomial(T[kjk][kjj]);
+
+    /* mji := LeadingMonomial(T[j][i]); */
+    
     Si := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[i]));
-    Sj := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[j]));
-    Sk := Sig_Multiply(sigs[i],1,mji div LeadingMonomial(G[k]));
-    return Sig_Leq(Sk,Si) or Sig_Leq(Sk,Sj);
+    Sj := Sig_Multiply(sigs[j],1,mji div LeadingMonomial(G[j]));
+    Sk := Sig_Multiply(sigs[k],1,mji div LeadingMonomial(G[k]));
+
+    Sji := Sig_Max(Si,Sj);
+
+    /* (i,k) < (i,j) */
+    testki := mji ne mki
+              or (mji eq mki
+                  and (kik lt jij
+                       or (kik eq jij and kii lt jii)
+                      ));
+
+    /* (j,k) < (i,j) */
+    testkj := mji ne mkj
+              or (mji eq mkj
+                  and (kjk lt jij
+                       or (kjk eq jij and kjj lt jii)
+                      ));
+
+    /* TODO : a lot of those tests are probably useless */
+    
+    return /* Sig_Lt(Sk,Sji) or  */(Sig_Lt(Sk,Sji) and testki and testkj);
 end function;
+
 
 function IsEqualUpToUnit(a,b)
     /* Implement comparison of polynomials up to an invertible
@@ -304,6 +349,7 @@ function IsEqualUpToUnit(a,b)
    */
     return IsDivisibleBy(a,b) and IsUnit(a div b);
 end function;
+
 
 function Criterion_Chain(T,G,sigs,i,j,k)
     /* Implement the chain criterion with signatures
@@ -327,7 +373,7 @@ function Criterion_Chain(T,G,sigs,i,j,k)
     end if;
 
     test := IsDivisibleBy(T[j][i],LeadingTerm(G[k])) and Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k);
-    
+
     return not test;
 end function;
     
@@ -346,13 +392,15 @@ function Criterion_Chain_back(T,G,sigs,i,j)
     - true if and only for all k <= #G, Chain(i,j;k) does not hold
    */
     test := true;
+    kk := 0;
     for k in [1..j-1] do
         if not Criterion_Chain(T,G,sigs,i,j,k) then
+            kk := k;
             test := false;
             break;
         end if;
     end for;
-    return test;
+    return test,kk;
 end function;
         
 
@@ -471,6 +519,10 @@ function Criterion_Singular(f,sf,G,sigs)
     return not test;
 end function;
 
+
+
+
+
 
 
 procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
@@ -518,17 +570,25 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     Append(~T,[]);
     t := LeadingTerm(f);
     for i in [1..N-1] do
+        /* tt := Lcm(LeadingTerm(G[i]),t); */
+        /* Append(~T[i],Lc) */
         Append(~T[N],Lcm(LeadingTerm(G[i]),t));
     end for;
     cnt_pairs +:= N-1;
+
     
     // Updating the list of critical pairs
     for i in [1..N-1] do
         if not Criterion_Coprime(f,G[i]) then
             cnt_coprime +:= 1;
         elif Signature then
-            if GebauerMoller and not Criterion_Chain_back(T,G,sigs,i,N) then
+            test_chain,k := Criterion_Chain_back(T,G,sigs,i,N);
+            if GebauerMoller and not test_chain then
                 cnt_GM_all +:= 1;
+                vprintf MollerSig,3: "Eliminated pair due to chain criterion (back): (i,j;k) = (%o,%o;%o) sig=%o\n",
+                                     i, N, k,
+                Sig_ToString(SPol_Sig(f,G[i],T[N][i],sf,sigs[i]));
+                
             else
                 cnt_Spairs +:= 1;
                 p,sp := SPol(f,G[i],T[N][i],sf,sigs[i]);
@@ -563,6 +623,8 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
             if Signature then
                 if not Criterion_Chain(T,G,sigs,ii,jj,N) then
                     cnt_GM_all +:= 1;
+                    vprintf MollerSig,3: "Eliminated pair due to chain criterion: (i,j;k) = (%o,%o;%o) sig=%o\n",
+                                         ii, jj, N, Sig_ToString(pp[2]);
                     Append(~toRemove,k);
                 end if;
             else
@@ -583,12 +645,18 @@ procedure UpdatePairsAndGB(~P,~G,~sigs,~SG,~sigsSG,~T,f,sf,
     Append(~sigsSG,sf);
     for i in [1..#SG-1] do
         p,sp := GPol(f,SG[i],sf,sigsSG[i]);
+        if sp`k eq 0 then
+            error("Illegal signature computed.");
+        end if;
         if p ne 0 then
             Append(~SG,p);
             Append(~sigsSG,sp);
         end if;
     end for;
 end procedure;
+
+
+
 
 function MollerSig(F:
                     Signature := true,
@@ -663,6 +731,14 @@ function MollerSig(F:
     cnt_syz := 0;
     cnt_pairs := 0;
     cnt_Spairs := 0;
+
+    A := Parent(F[1]);
+    R := CoefficientRing(A);
+    
+    if InterReduce and IsEuclideanDomain(CoefficientRing(A)) then
+        printf "Warning: for Euclidean domains, InterReduce can in theory lead to incorrect results.\n";
+        printf "Please use MollerSig_Euclidean instead.\n";
+    end if;
     
     G := [];
     SG := [];
@@ -671,7 +747,6 @@ function MollerSig(F:
     sigsSG := [];
     T := []; // T[j][i] is the lcm of the LT of G[i] and G[j]
     m := #F;
-    A := Parent(F[1]);
     for i in [1..m] do
         vprintf MollerSig,1: "############ i=%o ############\n",i;
 
@@ -680,13 +755,13 @@ function MollerSig(F:
             sigsSG := [Sig_Create(1,1,i-1) : g in SG];
             G := SG;
             sigs := sigsSG;
-            T := [[] : g in SG];
+            T := [[Lcm(LeadingTerm(G[j]),LeadingTerm(G[i])) : j in [1..i-1]] : i in [1..#G]];
         end if;
         
         f := F[i]; 
         sf := Sig_Create(1,1,i);
         f := TotalStrongReduce(f,sf,SG,sigsSG
-                               : Signature := Signature); 
+                               : Signature := Signature, LC_red := false); 
         if f eq 0 then
             continue;
         end if;
@@ -703,7 +778,8 @@ function MollerSig(F:
             if Signature then
                 if (F5_Criterion
                     and not Criterion_F5(p,sp,SG,sigsSG)) then
-                    vprintf MollerSig,3: "Polynomial excluded by F5 criterion\n"/* : sig=%o\n", Sig_ToString(sp) *//* , LeadingTerm(p) */;
+                    vprintf MollerSig,3: "Polynomial excluded by F5 criterion: <%o,%o>, sig=%o, LT=%o\n",
+                                         pp[3][1], pp[3][2], Sig_ToString(sp), LeadingTerm(p);
                     cnt_F5 +:= 1;
                     continue;
                 elif (Sing_Criterion
@@ -724,7 +800,7 @@ function MollerSig(F:
                 vprintf MollerSig,3 : "Basis element excluded because 1-singular reducible\n";
                 cnt_1sing_red +:= 1;
             else
-                r := TotalStrongReduce(r,sp,SG,sigsSG : Signature := Signature);
+                r := TotalStrongReduce(r,sp,SG,sigsSG : Signature := Signature, LC_red := false);
                 vprintf MollerSig,3 : "New basis element: sig=%o, LT=%o\n",
                        Sig_ToString(sp), LeadingTerm(r);//, pp[3];
                 /* end if; */
@@ -751,8 +827,6 @@ function MollerSig(F:
     vprintf MollerSig,1 : "Total # of skipped pairs with F5 criterion: %o\n", cnt_F5;
     vprintf MollerSig,1 : "Total # of skipped pairs with sing criterion: %o\n", cnt_sing;
     vprintf MollerSig,1 : "Total # of skipped 1-singular-reducible pols: %o\n", cnt_1sing_red;
-    
+                                                                                    
     return G,SG,sigs,sigsSG,T;    
 end function;
-
-
