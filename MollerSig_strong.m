@@ -1,6 +1,6 @@
 // Created: Fri May  4 13:28:56 2018
-// Last modified: Wed Mar  6 11:49:32 2019
-// Hash: 3ef3a23b147270a205604a50dfacab4c
+// Last modified: Wed Mar 20 17:26:43 2019
+// Hash: 5dad9349f17f68b3098e3d88d48fe014
 
 Attach("general.m");
 
@@ -260,7 +260,7 @@ function Criterion_Coprime(f,g)
     
    */
     
-    return Gcd(LeadingMonomial(f),LeadingMonomial(g)) ne 1;
+    return Gcd(LeadingTerm(f),LeadingTerm(g)) ne 1;
 end function;
 
 function Criterion_GebauerMoller_admissible(T,G,sigs,i,j,k)
