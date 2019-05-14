@@ -1,8 +1,9 @@
 // Created: Wed Dec 13 17:47:42 2017
-// Last modified: Mon Jan 28 16:13:12 2019
-// Hash: 1ae0b3957a865ace2f3fd7be58a735d1
+// Last modified: Tue May 14 11:57:26 2019
+// Hash: ef84d4d4efe8aa70e9df13c1636ca187
 
-load "Signatures.m";
+Attach("general.m");
+load "Signatures_old.m";
 
 function SatSet_of_mon(LMs,m,XS)
     /* Returns the largest saturated set of {1..m} wrt LMs[1]...LMs[m]
@@ -415,7 +416,9 @@ function MollerSig_weak (F,funs :
                     printf "Reduction to 0\n";
                     cnt_red0 +:= 1;
                     //error "";
-                elif Signature and OneSingularReducible(g,SigG,sigs,LMs,ss) then
+                elif Signature and OneSingularReducible(gg,SigG,sigs,LMs,ss)
+                                                       //OneSingularReducible(gg,SigG,sigs,LMs,#sigs+1)
+                    then
                     /* 1-Singular reducible */
                     
                     printf "1-singular reducible: %o\n", gg;
