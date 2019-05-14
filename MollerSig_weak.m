@@ -1,6 +1,6 @@
 // Created: Wed Dec 13 17:47:42 2017
-// Last modified: Tue May 14 11:57:26 2019
-// Hash: ef84d4d4efe8aa70e9df13c1636ca187
+// Last modified: Tue May 14 11:57:58 2019
+// Hash: 1a4c44eccaa97014ef2ceea4036895ee
 
 Attach("general.m");
 load "Signatures_old.m";
@@ -260,13 +260,13 @@ function SatSets_Generate_maybe_regular(ss,LMs,sigs
 end function;
 
 
-function OneSingularReducible(g,SigG,sigs,LMs,ss)
+function OneSingularReducible(g,SigG,sigs,LMs)
     /* Test if a candidate basis element is 1-singular reducible.
 
     Implementation of 1-SingularReducible (Algorithm 4)
    */
     LMg := LeadingMonomial(g);
-    test := exists{j : j in [1..ss-1] | IsDivisibleBy(LMg,LMs[j])
+    test := exists{j : j in [1..#sigs] | IsDivisibleBy(LMg,LMs[j])
                                         and ((LMg div LMs[j])*(sigs[j]`mu))
                                             eq SigG`mu
                                         and sigs[j]`i eq SigG`i
@@ -416,8 +416,7 @@ function MollerSig_weak (F,funs :
                     printf "Reduction to 0\n";
                     cnt_red0 +:= 1;
                     //error "";
-                elif Signature and OneSingularReducible(gg,SigG,sigs,LMs,ss)
-                                                       //OneSingularReducible(gg,SigG,sigs,LMs,#sigs+1)
+                elif Signature and OneSingularReducible(gg,SigG,sigs,LMs)
                     then
                     /* 1-Singular reducible */
                     
